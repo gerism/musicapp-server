@@ -45,7 +45,7 @@ const uploadGaleria = multer({
 
 // Listagem alfabética + busca + filtros
 app.get('/artistas', async (req, res) => {
-  const { busca, cidade, genero } = req.query;
+  const { busca, cidade, genero, tipo } = req.query;
   const cond = ['ativo = true'];
   const params = [];
 
@@ -61,9 +61,13 @@ app.get('/artistas', async (req, res) => {
     params.push(genero);
     cond.push(`$${params.length} = ANY(generos)`);
   }
+  if (tipo) {
+    params.push(tipo);
+    cond.push(`tipo_artista = $${params.length}`);
+  }
 
   const sql = `
-    SELECT id, nome_artistico, cidade, estado, generos, foto_capa_url, verificado
+    SELECT id, nome_artistico, tipo_artista, cidade, estado, generos, foto_capa_url, verificado
     FROM artistas
     WHERE ${cond.join(' AND ')}
     ORDER BY nome_artistico ASC
@@ -120,7 +124,7 @@ app.get('/artistas/dispositivo/:deviceId', async (req, res) => {
 app.put('/artistas/:id', async (req, res) => {
   const { id } = req.params;
   const campos = [
-    'nome_artistico', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'shows_feitos', 'generos', 'bio',
+    'nome_artistico', 'tipo_artista', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'shows_feitos', 'generos', 'bio',
     'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'redes_sociais', 'whatsapp',
   ];
   const camposJson = ['redes_sociais']; // precisam ser serializados antes de ir pro Postgres (coluna JSONB)
@@ -174,7 +178,7 @@ app.delete('/artistas/:id', async (req, res) => {
 
 app.post('/artistas', async (req, res) => {
   const {
-    nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
+    nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
     bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id
   } = req.body;
 
@@ -194,10 +198,10 @@ app.post('/artistas', async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+        (nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
-      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
+      [nome_artistico, tipo_artista || 'Cantor', cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
