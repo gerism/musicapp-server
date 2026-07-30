@@ -245,6 +245,14 @@ app.post('/artistas/:id/galeria', (req, res) => {
     if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
 
     try {
+      const contagem = await pool.query(
+        'SELECT COUNT(*) FROM artista_fotos WHERE artista_id = $1',
+        [id],
+      );
+      if (parseInt(contagem.rows[0].count, 10) >= 6) {
+        return res.status(400).json({ erro: 'Limite de 6 fotos na galeria atingido' });
+      }
+
       const { rows } = await pool.query(
         'INSERT INTO artista_fotos (artista_id, url, public_id) VALUES ($1,$2,$3) RETURNING *',
         [id, req.file.path, req.file.filename]
