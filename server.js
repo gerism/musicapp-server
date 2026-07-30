@@ -103,6 +103,19 @@ app.get('/artistas/:id', async (req, res) => {
 });
 
 // Criar perfil (cadastro do músico)
+// Verifica se esse aparelho já tem um perfil criado
+app.get('/artistas/dispositivo/:deviceId', async (req, res) => {
+  const { deviceId } = req.params;
+  try {
+    const { rows } = await pool.query('SELECT id FROM artistas WHERE device_id = $1', [deviceId]);
+    if (rows.length === 0) return res.status(404).json({ erro: 'Nenhum perfil encontrado' });
+    res.json({ id: rows[0].id });
+  } catch (err) {
+    console.error('Erro ao buscar por device_id:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao verificar perfil' });
+  }
+});
+
 // Editar perfil existente
 app.put('/artistas/:id', async (req, res) => {
   const { id } = req.params;
@@ -162,19 +175,35 @@ app.delete('/artistas/:id', async (req, res) => {
 app.post('/artistas', async (req, res) => {
   const {
     nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
-    bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp
+    bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id
   } = req.body;
 
+  if (!device_id) {
+    return res.status(400).json({ erro: 'device_id é obrigatório' });
+  }
+
   try {
+    // Verifica antes se esse aparelho já tem perfil (mensagem mais amigável que o erro de constraint)
+    const existente = await pool.query('SELECT id FROM artistas WHERE device_id = $1', [device_id]);
+    if (existente.rows.length > 0) {
+      return res.status(409).json({
+        erro: 'Este aparelho já tem um perfil de artista cadastrado',
+        artista_id: existente.rows[0].id,
+      });
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
-      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp]
+      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
+    if (err.code === '23505') { // unique_violation (corrida entre duas requisições simultâneas)
+      return res.status(409).json({ erro: 'Este aparelho já tem um perfil de artista cadastrado' });
+    }
     console.error(err);
     res.status(500).json({ erro: 'Erro ao criar perfil' });
   }
