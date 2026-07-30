@@ -227,6 +227,50 @@ app.post('/artistas/:id/galeria', (req, res) => {
   });
 });
 
+// Remover a FOTO DE PERFIL (volta pra sem foto)
+app.delete('/artistas/:id/foto-perfil', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const atual = await pool.query('SELECT foto_capa_url FROM artistas WHERE id = $1', [id]);
+    const urlAtual = atual.rows[0]?.foto_capa_url;
+
+    await pool.query('UPDATE artistas SET foto_capa_url = NULL WHERE id = $1', [id]);
+
+    // Tenta limpar do Cloudinary também (não bloqueia a resposta se falhar)
+    if (urlAtual) {
+      const match = urlAtual.match(/musicapp\/capas\/[^./]+/);
+      if (match) cloudinary.uploader.destroy(match[0]).catch(() => {});
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao remover foto de perfil:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao remover foto de perfil' });
+  }
+});
+
+// Remover uma foto específica da GALERIA
+app.delete('/artistas/:id/galeria/:fotoId', async (req, res) => {
+  const { id, fotoId } = req.params;
+  try {
+    const foto = await pool.query(
+      'SELECT public_id FROM artista_fotos WHERE id = $1 AND artista_id = $2',
+      [fotoId, id],
+    );
+    if (foto.rows.length === 0) return res.status(404).json({ erro: 'Foto não encontrada' });
+
+    await pool.query('DELETE FROM artista_fotos WHERE id = $1', [fotoId]);
+
+    const publicId = foto.rows[0].public_id;
+    if (publicId) cloudinary.uploader.destroy(publicId).catch(() => {});
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao remover foto da galeria:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao remover foto' });
+  }
+});
+
 // ============================================
 // DATAS DISPONÍVEIS
 // ============================================
