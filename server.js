@@ -180,37 +180,51 @@ app.post('/artistas', async (req, res) => {
 });
 
 // Upload/troca da FOTO DE PERFIL
-app.post('/artistas/:id/foto-perfil', uploadCapa.single('foto'), async (req, res) => {
-  const { id } = req.params;
-  if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
+app.post('/artistas/:id/foto-perfil', (req, res) => {
+  uploadCapa.single('foto')(req, res, async (err) => {
+    if (err) {
+      console.error('Erro no upload (foto-perfil):', err.message || err);
+      return res.status(500).json({ erro: `Erro no upload: ${err.message || 'falha desconhecida'}` });
+    }
 
-  try {
-    const { rows } = await pool.query(
-      'UPDATE artistas SET foto_capa_url = $1 WHERE id = $2 RETURNING foto_capa_url',
-      [req.file.path, id]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ erro: 'Erro ao salvar foto de perfil' });
-  }
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
+
+    try {
+      const { rows } = await pool.query(
+        'UPDATE artistas SET foto_capa_url = $1 WHERE id = $2 RETURNING foto_capa_url',
+        [req.file.path, id]
+      );
+      res.json(rows[0]);
+    } catch (err2) {
+      console.error('Erro ao salvar no banco (foto-perfil):', err2.message || err2);
+      res.status(500).json({ erro: 'Erro ao salvar foto de perfil' });
+    }
+  });
 });
 
 // Adicionar foto na GALERIA
-app.post('/artistas/:id/galeria', uploadGaleria.single('foto'), async (req, res) => {
-  const { id } = req.params;
-  if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
+app.post('/artistas/:id/galeria', (req, res) => {
+  uploadGaleria.single('foto')(req, res, async (err) => {
+    if (err) {
+      console.error('Erro no upload (galeria):', err.message || err);
+      return res.status(500).json({ erro: `Erro no upload: ${err.message || 'falha desconhecida'}` });
+    }
 
-  try {
-    const { rows } = await pool.query(
-      'INSERT INTO artista_fotos (artista_id, url, public_id) VALUES ($1,$2,$3) RETURNING *',
-      [id, req.file.path, req.file.filename]
-    );
-    res.status(201).json(rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ erro: 'Erro ao adicionar foto' });
-  }
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
+
+    try {
+      const { rows } = await pool.query(
+        'INSERT INTO artista_fotos (artista_id, url, public_id) VALUES ($1,$2,$3) RETURNING *',
+        [id, req.file.path, req.file.filename]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err2) {
+      console.error('Erro ao salvar no banco (galeria):', err2.message || err2);
+      res.status(500).json({ erro: 'Erro ao adicionar foto' });
+    }
+  });
 });
 
 // ============================================
