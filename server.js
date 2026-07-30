@@ -142,6 +142,22 @@ app.put('/artistas/:id', async (req, res) => {
   }
 });
 
+// Excluir perfil (remove também fotos, datas e avaliações, por causa do ON DELETE CASCADE)
+app.delete('/artistas/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM artistas WHERE id = $1 RETURNING id',
+      [id],
+    );
+    if (rows.length === 0) return res.status(404).json({ erro: 'Artista não encontrado' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao excluir perfil' });
+  }
+});
+
 app.post('/artistas', async (req, res) => {
   const {
     nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
