@@ -102,11 +102,12 @@ app.get('/artistas/:id', async (req, res) => {
   }
 });
 
+// Criar perfil (cadastro do músico)
 // Editar perfil existente
 app.put('/artistas/:id', async (req, res) => {
   const { id } = req.params;
   const campos = [
-    'nome_artistico', 'cidade', 'estado', 'raio_km', 'generos', 'bio',
+    'nome_artistico', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'generos', 'bio',
     'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'whatsapp',
   ];
 
@@ -141,20 +142,19 @@ app.put('/artistas/:id', async (req, res) => {
   }
 });
 
-// Criar perfil (cadastro do músico)
 app.post('/artistas', async (req, res) => {
   const {
-    nome_artistico, cidade, estado, raio_km, generos,
+    nome_artistico, cidade, estado, raio_km, anos_experiencia, generos,
     bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp
   } = req.body;
 
   try {
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, cidade, estado, raio_km, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        (nome_artistico, cidade, estado, raio_km, anos_experiencia, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
-      [nome_artistico, cidade, estado, raio_km || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, whatsapp]
+      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, whatsapp]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -203,7 +203,7 @@ app.post('/artistas/:id/galeria', uploadGaleria.single('foto'), async (req, res)
 
 app.post('/artistas/:id/datas', async (req, res) => {
   const { id } = req.params;
-  const { data, status } = req.body;
+  const { data, status } = req.body; // status: 'livre' | 'reservado'
 
   try {
     const { rows } = await pool.query(
