@@ -108,8 +108,9 @@ app.put('/artistas/:id', async (req, res) => {
   const { id } = req.params;
   const campos = [
     'nome_artistico', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'shows_feitos', 'generos', 'bio',
-    'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'whatsapp',
+    'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'redes_sociais', 'whatsapp',
   ];
+  const camposJson = ['redes_sociais']; // precisam ser serializados antes de ir pro Postgres (coluna JSONB)
 
   const sets = [];
   const valores = [];
@@ -118,7 +119,7 @@ app.put('/artistas/:id', async (req, res) => {
   for (const campo of campos) {
     if (req.body[campo] !== undefined) {
       sets.push(`${campo} = $${i}`);
-      valores.push(req.body[campo]);
+      valores.push(camposJson.includes(campo) ? JSON.stringify(req.body[campo]) : req.body[campo]);
       i++;
     }
   }
@@ -161,16 +162,16 @@ app.delete('/artistas/:id', async (req, res) => {
 app.post('/artistas', async (req, res) => {
   const {
     nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
-    bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp
+    bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp
   } = req.body;
 
   try {
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
-      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, whatsapp]
+      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
