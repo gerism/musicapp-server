@@ -102,6 +102,45 @@ app.get('/artistas/:id', async (req, res) => {
   }
 });
 
+// Editar perfil existente
+app.put('/artistas/:id', async (req, res) => {
+  const { id } = req.params;
+  const campos = [
+    'nome_artistico', 'cidade', 'estado', 'raio_km', 'generos', 'bio',
+    'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'whatsapp',
+  ];
+
+  const sets = [];
+  const valores = [];
+  let i = 1;
+
+  for (const campo of campos) {
+    if (req.body[campo] !== undefined) {
+      sets.push(`${campo} = $${i}`);
+      valores.push(req.body[campo]);
+      i++;
+    }
+  }
+
+  if (sets.length === 0) {
+    return res.status(400).json({ erro: 'Nenhum campo para atualizar' });
+  }
+
+  valores.push(id);
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE artistas SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+      valores,
+    );
+    if (rows.length === 0) return res.status(404).json({ erro: 'Artista não encontrado' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao atualizar perfil' });
+  }
+});
+
 // Criar perfil (cadastro do músico)
 app.post('/artistas', async (req, res) => {
   const {
@@ -164,7 +203,7 @@ app.post('/artistas/:id/galeria', uploadGaleria.single('foto'), async (req, res)
 
 app.post('/artistas/:id/datas', async (req, res) => {
   const { id } = req.params;
-  const { data, status } = req.body; // status: 'livre' | 'reservado'
+  const { data, status } = req.body;
 
   try {
     const { rows } = await pool.query(
