@@ -107,7 +107,7 @@ app.get('/artistas/:id', async (req, res) => {
 app.put('/artistas/:id', async (req, res) => {
   const { id } = req.params;
   const campos = [
-    'nome_artistico', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'generos', 'bio',
+    'nome_artistico', 'cidade', 'estado', 'raio_km', 'anos_experiencia', 'shows_feitos', 'generos', 'bio',
     'formato', 'equipamento_proprio', 'duracao_media', 'cache_info', 'whatsapp',
   ];
 
@@ -144,17 +144,17 @@ app.put('/artistas/:id', async (req, res) => {
 
 app.post('/artistas', async (req, res) => {
   const {
-    nome_artistico, cidade, estado, raio_km, anos_experiencia, generos,
+    nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos,
     bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp
   } = req.body;
 
   try {
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, cidade, estado, raio_km, anos_experiencia, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+        (nome_artistico, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, whatsapp)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
-      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, whatsapp]
+      [nome_artistico, cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, whatsapp]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
