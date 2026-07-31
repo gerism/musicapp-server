@@ -91,7 +91,7 @@ app.get('/artistas/:id', async (req, res) => {
 
     const fotos = await pool.query('SELECT * FROM artista_fotos WHERE artista_id = $1 ORDER BY ordem', [id]);
     const datas = await pool.query(
-      'SELECT data, status FROM datas_disponiveis WHERE artista_id = $1 AND data >= CURRENT_DATE ORDER BY data',
+      'SELECT data, status, observacao FROM datas_disponiveis WHERE artista_id = $1 AND data >= CURRENT_DATE ORDER BY data',
       [id]
     );
     const avaliacoes = await pool.query(
@@ -319,14 +319,14 @@ app.delete('/artistas/:id/galeria/:fotoId', async (req, res) => {
 
 app.post('/artistas/:id/datas', async (req, res) => {
   const { id } = req.params;
-  const { data, status } = req.body; // status: 'livre' | 'reservado'
+  const { data, status, observacao } = req.body; // status: 'livre' | 'reservado'
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO datas_disponiveis (artista_id, data, status) VALUES ($1,$2,$3)
-       ON CONFLICT (artista_id, data) DO UPDATE SET status = $3
+      `INSERT INTO datas_disponiveis (artista_id, data, status, observacao) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (artista_id, data) DO UPDATE SET status = $3, observacao = $4
        RETURNING *`,
-      [id, data, status || 'livre']
+      [id, data, status || 'livre', observacao || null]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
