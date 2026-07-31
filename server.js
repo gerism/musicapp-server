@@ -107,6 +107,19 @@ app.get('/artistas/:id', async (req, res) => {
 });
 
 // Criar perfil (cadastro do músico)
+// Lista de cidades já usadas por outros artistas (pra autocomplete no cadastro)
+app.get('/cidades', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT cidade, estado FROM artistas WHERE ativo = true ORDER BY cidade ASC`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('Erro ao buscar cidades:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao buscar cidades' });
+  }
+});
+
 // Verifica se esse aparelho já tem um perfil criado
 app.get('/artistas/dispositivo/:deviceId', async (req, res) => {
   const { deviceId } = req.params;
