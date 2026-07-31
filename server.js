@@ -46,7 +46,10 @@ const uploadGaleria = multer({
 // Listagem alfabética + busca + filtros
 app.get('/artistas', async (req, res) => {
   const { busca, cidade, genero, tipo } = req.query;
-  const cond = ['ativo = true'];
+  const cond = [
+    'ativo = true',
+    "(assinatura_status = 'ativo' OR (assinatura_status = 'trial' AND assinatura_vence_em > now()))",
+  ];
   const params = [];
 
   if (busca) {
@@ -108,6 +111,77 @@ app.get('/artistas/:id', async (req, res) => {
 
 // Criar perfil (cadastro do músico)
 // Lista de cidades já usadas por outros artistas (pra autocomplete no cadastro)
+// ============================================
+// ASSINATURA (Google Play Billing)
+// ============================================
+
+// Consulta o status de assinatura do artista (trial/ativo/vencido) e
+// atualiza automaticamente pra 'vencido' se a data já passou.
+app.get('/artistas/:id/assinatura', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'SELECT assinatura_status, assinatura_vence_em FROM artistas WHERE id = $1',
+      [id],
+    );
+    if (rows.length === 0) return res.status(404).json({ erro: 'Artista não encontrado' });
+
+    let { assinatura_status, assinatura_vence_em } = rows[0];
+    const venceu = assinatura_vence_em && new Date(assinatura_vence_em) < new Date();
+
+    if (venceu && assinatura_status !== 'vencido') {
+      await pool.query("UPDATE artistas SET assinatura_status = 'vencido' WHERE id = $1", [id]);
+      assinatura_status = 'vencido';
+    }
+
+    res.json({ assinatura_status, assinatura_vence_em });
+  } catch (err) {
+    console.error('Erro ao consultar assinatura:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao consultar assinatura' });
+  }
+});
+
+// Confirma uma assinatura paga pela Play Store.
+//
+// ⚠️ TODO ANTES DE IR PRA PRODUÇÃO:
+// Hoje esta rota confia no que o app manda (o "purchaseToken" gerado pelo
+// Google após o pagamento), sem checar de verdade se ele é válido. Isso é
+// suficiente pra TESTAR o fluxo completo, mas não é seguro pra produção —
+// qualquer pessoa poderia chamar essa rota manualmente e "ativar" a
+// assinatura sem pagar nada.
+//
+// Antes de lançar de verdade, trocar o bloco abaixo por uma chamada real
+// à Google Play Developer API (biblioteca "googleapis", método
+// androidpublisher.purchases.subscriptions.get), usando uma conta de
+// serviço (service account) criada no Google Cloud e associada ao seu
+// Play Console. Só marcar como 'ativo' se o Google confirmar que o
+// purchaseToken é válido e não foi usado/cancelado/reembolsado.
+app.post('/artistas/:id/assinatura/confirmar', async (req, res) => {
+  const { id } = req.params;
+  const { purchaseToken } = req.body;
+
+  if (!purchaseToken) {
+    return res.status(400).json({ erro: 'purchaseToken é obrigatório' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE artistas
+       SET assinatura_status = 'ativo',
+           assinatura_vence_em = now() + interval '30 days',
+           google_purchase_token = $1
+       WHERE id = $2
+       RETURNING id, assinatura_status, assinatura_vence_em`,
+      [purchaseToken, id],
+    );
+    if (rows.length === 0) return res.status(404).json({ erro: 'Artista não encontrado' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Erro ao confirmar assinatura:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao confirmar assinatura' });
+  }
+});
+
 app.get('/cidades', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -211,8 +285,8 @@ app.post('/artistas', async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO artistas
-        (nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        (nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id, assinatura_status, assinatura_vence_em)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'trial', now() + interval '7 days')
        RETURNING *`,
       [nome_artistico, tipo_artista || 'Cantor', cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
     );
