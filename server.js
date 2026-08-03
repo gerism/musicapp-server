@@ -212,6 +212,11 @@ app.post('/artistas/:id/assinatura/confirmar', async (req, res) => {
 // link de checkout (init_point) pra redirecionar o navegador.
 app.post('/artistas/:id/assinatura-site/criar', async (req, res) => {
   const { id } = req.params;
+  const { payer_email } = req.body;
+
+  if (!payer_email) {
+    return res.status(400).json({ erro: 'E-mail é obrigatório para criar a assinatura' });
+  }
 
   try {
     const artista = await pool.query(
@@ -231,6 +236,7 @@ app.post('/artistas/:id/assinatura-site/criar', async (req, res) => {
       body: JSON.stringify({
         reason: 'Assinatura PalcoLivre',
         external_reference: String(id),
+        payer_email,
         back_url: 'https://SUBSTITUA-PELO-SEU-DOMINIO.com.br/perfil.html?id=' + id,
         auto_recurring: {
           frequency: 1,
