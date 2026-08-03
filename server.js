@@ -204,6 +204,92 @@ app.post('/artistas/:id/assinatura/confirmar', async (req, res) => {
   }
 });
 
+// ============================================
+// ASSINATURA VIA SITE (Mercado Pago)
+// ============================================
+
+// Cria uma assinatura recorrente no Mercado Pago pro artista e devolve o
+// link de checkout (init_point) pra redirecionar o navegador.
+app.post('/artistas/:id/assinatura-site/criar', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const artista = await pool.query(
+      'SELECT id, nome_artistico, whatsapp FROM artistas WHERE id = $1',
+      [id],
+    );
+    if (artista.rows.length === 0) {
+      return res.status(404).json({ erro: 'Artista não encontrado' });
+    }
+
+    const resp = await fetch('https://api.mercadopago.com/preapproval', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({
+        reason: 'Assinatura PalcoLivre',
+        external_reference: String(id),
+        back_url: 'https://SUBSTITUA-PELO-SEU-DOMINIO.com.br/perfil.html?id=' + id,
+        auto_recurring: {
+          frequency: 1,
+          frequency_type: 'months',
+          transaction_amount: 10,
+          currency_id: 'BRL',
+          free_trial: { frequency: 7, frequency_type: 'days' },
+        },
+        status: 'pending',
+      }),
+    });
+
+    const dados = await resp.json();
+    if (!resp.ok) {
+      console.error('Erro do Mercado Pago:', dados);
+      return res.status(500).json({ erro: 'Erro ao criar assinatura no Mercado Pago' });
+    }
+
+    await pool.query('UPDATE artistas SET mp_preapproval_id = $1 WHERE id = $2', [dados.id, id]);
+
+    res.json({ init_point: dados.init_point });
+  } catch (err) {
+    console.error('Erro ao criar assinatura:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao criar assinatura' });
+  }
+});
+
+// Webhook: o Mercado Pago chama essa rota automaticamente quando o status
+// de uma assinatura muda (aprovada, cancelada, etc.)
+app.post('/webhook-assinatura-site', async (req, res) => {
+  try {
+    const preapprovalId = req.body?.data?.id || req.query['data.id'];
+    if (!preapprovalId) return res.status(200).send('ok');
+
+    const resp = await fetch(`https://api.mercadopago.com/preapproval/${preapprovalId}`, {
+      headers: { Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}` },
+    });
+    const assinatura = await resp.json();
+
+    if (assinatura.status === 'authorized') {
+      await pool.query(
+        `UPDATE artistas
+         SET assinatura_status = 'ativo', assinatura_vence_em = now() + interval '30 days'
+         WHERE mp_preapproval_id = $1`,
+        [preapprovalId],
+      );
+    } else if (assinatura.status === 'cancelled' || assinatura.status === 'paused') {
+      await pool.query(
+        `UPDATE artistas SET assinatura_status = 'vencido' WHERE mp_preapproval_id = $1`,
+        [preapprovalId],
+      );
+    }
+
+    res.status(200).send('ok');
+  } catch (err) {
+    console.error('Erro no webhook de assinatura:', err.message || err);
+    res.status(200).send('ok');
+  }
+});
 app.get('/cidades', async (req, res) => {
   try {
     const { rows } = await pool.query(
