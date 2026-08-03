@@ -52,10 +52,17 @@ app.get('/artistas', async (req, res) => {
   ];
   const params = [];
 
-  if (busca) {
-    params.push(`%${busca}%`);
-    cond.push(`(nome_artistico ILIKE $${params.length} OR cidade ILIKE $${params.length})`);
-  }
+  iif (busca) {
+  // translate() remove os acentos mais comuns dos dois lados da comparação,
+  // então buscar "Claudio" (sem acento) também encontra "Cláudio" no banco.
+  params.push(`%${busca}%`);
+  cond.push(`(
+    translate(nome_artistico, 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')
+    ILIKE translate($${params.length}, 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')
+    OR translate(cidade, 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')
+    ILIKE translate($${params.length}, 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC')
+  )`);
+}
   if (cidade) {
     params.push(cidade);
     cond.push(`cidade = $${params.length}`);
