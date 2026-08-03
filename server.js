@@ -52,7 +52,7 @@ app.get('/artistas', async (req, res) => {
   ];
   const params = [];
 
-  iif (busca) {
+if (busca) {
   // translate() remove os acentos mais comuns dos dois lados da comparação,
   // então buscar "Claudio" (sem acento) também encontra "Cláudio" no banco.
   params.push(`%${busca}%`);
