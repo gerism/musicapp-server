@@ -92,6 +92,21 @@ if (busca) {
   }
 });
 
+
+app.get('/artistas/contagem', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*) FROM artistas
+       WHERE ativo = true
+       AND (assinatura_status = 'ativo' OR (assinatura_status = 'trial' AND assinatura_vence_em > now()))`
+    );
+    res.json({ total: parseInt(rows[0].count, 10) });
+  } catch (err) {
+    console.error('Erro ao contar artistas:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao contar artistas' });
+  }
+});
+
 // Perfil completo de um artista
 app.get('/artistas/:id', async (req, res) => {
   const { id } = req.params;
@@ -201,20 +216,7 @@ app.get('/cidades', async (req, res) => {
   }
 });
 
-// Contagem de artistas cadastrados e ativos (pra mostrar na tela inicial)
-app.get('/artistas/contagem', async (req, res) => {
-  try {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*) FROM artistas
-       WHERE ativo = true
-       AND (assinatura_status = 'ativo' OR (assinatura_status = 'trial' AND assinatura_vence_em > now()))`
-    );
-    res.json({ total: parseInt(rows[0].count, 10) });
-  } catch (err) {
-    console.error('Erro ao contar artistas:', err.message || err);
-    res.status(500).json({ erro: 'Erro ao contar artistas' });
-  }
-});
+
 
 // Verifica se esse aparelho já tem um perfil criado
 app.get('/artistas/dispositivo/:deviceId', async (req, res) => {
