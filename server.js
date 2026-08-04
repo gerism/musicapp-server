@@ -10,6 +10,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve o site (HTML/CSS/JS) direto por aqui — complementa o app, no
+// mesmo servidor/domínio da API. Acessível em:
+// https://musicapp-server-production.up.railway.app/
+app.use(express.static('site'));
+
 // ---------- Banco (Railway Postgres) ----------
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

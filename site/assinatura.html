@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assinatura — PalcoLivre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a href="#" id="linkVoltar" class="back">← Voltar</a>
+</div>
+
+<div class="wrap" style="max-width:500px; text-align:center; padding-top:10px;">
+  <h2 style="font-family:'Fraunces',serif; font-size:24px; margin-bottom:8px;">Assinatura PalcoLivre</h2>
+  <p style="color:var(--muted); font-size:13px; margin-bottom:24px;">
+    Seu perfil fica visível na busca enquanto a assinatura estiver ativa.
+  </p>
+
+  <div id="statusBox" style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:20px;">
+    Carregando status...
+  </div>
+
+  <button id="btnAssinar" class="btn-primary" style="display:none;">
+    Assinar por R$10/mês (7 dias grátis)
+  </button>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+const id = getQueryParam('id');
+document.getElementById('linkVoltar').href = `editar.html?id=${id}`;
+
+if (!id) {
+  document.getElementById('statusBox').textContent = 'Perfil não encontrado.';
+} else {
+  carregarStatus();
+}
+
+async function carregarStatus() {
+  const box = document.getElementById('statusBox');
+  const btn = document.getElementById('btnAssinar');
+  try {
+    const status = await consultarAssinatura(id);
+    if (status.assinatura_status === 'ativo') {
+      box.innerHTML = `✅ Assinatura ativa até <b>${new Date(status.assinatura_vence_em).toLocaleDateString('pt-BR')}</b>`;
+    } else if (status.assinatura_status === 'trial') {
+      box.innerHTML = `🎁 Em período de teste grátis até <b>${new Date(status.assinatura_vence_em).toLocaleDateString('pt-BR')}</b>`;
+      btn.style.display = 'block';
+    } else {
+      box.innerHTML = `⚠️ Assinatura vencida. Seu perfil não aparece na busca.`;
+      btn.style.display = 'block';
+    }
+  } catch (e) {
+    box.textContent = 'Não foi possível carregar o status da assinatura.';
+  }
+}
+
+document.getElementById('btnAssinar').addEventListener('click', async () => {
+  const email = prompt('Digite seu e-mail (usado para o pagamento e recibo):');
+  if (!email || !email.includes('@')) {
+    mostrarToast('Informe um e-mail válido para continuar');
+    return;
+  }
+
+  const btn = document.getElementById('btnAssinar');
+  btn.disabled = true;
+  btn.textContent = 'Redirecionando...';
+  try {
+    const resultado = await criarAssinaturaSite(id, email);
+    window.location.href = resultado.init_point;
+  } catch (e) {
+    mostrarToast('Não foi possível iniciar a assinatura. Tenta de novo em instantes.');
+    btn.disabled = false;
+    btn.textContent = 'Assinar por R$10/mês (7 dias grátis)';
+  }
+});
+</script>
+
+</body>
+</html>

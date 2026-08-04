@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Editar perfil — PalcoLivre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a href="#" id="linkVoltar" class="back">← Voltar</a>
+</div>
+
+<div class="wrap" id="conteudo" style="padding-top:10px;">
+  <div class="loading">Carregando...</div>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+const id = getQueryParam('id');
+const MAX_FOTOS_GALERIA = 6;
+let artistaAtual = null;
+
+document.getElementById('linkVoltar').href = `perfil.html?id=${id}`;
+
+async function carregar() {
+  try {
+    artistaAtual = await buscarPerfilArtista(id);
+
+    // Proteção no navegador: se quem abriu essa página não é o dono do
+    // perfil (device_id diferente do salvo no localStorage), bloqueia a
+    // edição. ATENÇÃO: isso é só uma trava visual — o servidor ainda
+    // precisa validar isso também nas rotas PUT/DELETE antes de ir pra
+    // produção aberta, senão dá pra editar via chamada direta na API.
+    const souDono = artistaAtual.device_id && artistaAtual.device_id === getDeviceId();
+    if (!souDono) {
+      document.getElementById('conteudo').innerHTML = `
+        <div class="empty-msg">
+          Você não tem permissão para editar esse perfil.<br><br>
+          <a href="perfil.html?id=${id}" class="rede-btn" style="display:inline-block;">Voltar ao perfil</a>
+        </div>`;
+      return;
+    }
+
+    render();
+  } catch (e) {
+    document.getElementById('conteudo').innerHTML = `<div class="empty-msg">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function render() {
+  const a = artistaAtual;
+  const redes = a.redes_sociais || {};
+
+  document.getElementById('conteudo').innerHTML = `
+    <h2 style="font-family:'Fraunces',serif; font-size:24px; margin-bottom:8px;">Editar perfil</h2>
+
+    <label class="form-label">Foto de perfil</label>
+    <div class="photo-perfil-wrap" id="fotoPerfilWrap">
+      <img src="${a.foto_capa_url || ''}" id="imgFotoPerfil">
+      <div class="photo-perfil-overlay" id="overlayFotoPerfil">📷 Trocar foto</div>
+      ${a.foto_capa_url ? '<div class="photo-delete-badge" onclick="event.stopPropagation(); removerFotoPerfil()">✕</div>' : ''}
+    </div>
+    <input type="file" id="inputFotoPerfil" accept="image/*" style="display:none;">
+
+    <div class="section-head-row" style="margin-top:20px;">
+      <label class="form-label" style="margin:0;">Galeria de fotos</label>
+      <span class="photo-counter">${a.fotos.length}/${MAX_FOTOS_GALERIA}</span>
+    </div>
+    <div class="gallery-edit-row" id="galeriaRow" style="margin-top:8px;">
+      ${a.fotos.map(f => `
+        <div class="gallery-edit-item">
+          <img src="${f.url}">
+          <div class="gallery-delete-badge" onclick="removerFotoGaleria(${f.id})">✕</div>
+        </div>`).join('')}
+      ${a.fotos.length < MAX_FOTOS_GALERIA ? `<div class="add-photo-btn" id="btnAddFoto">+ Adicionar</div>` : ''}
+    </div>
+    <input type="file" id="inputFotoGaleria" accept="image/*" style="display:none;">
+
+  <label class="form-label" style="margin-top:24px;">Bio</label>
+    <textarea id="bio" class="form-textarea">${escapeHtml(a.bio || '')}</textarea>
+
+    ${a.tipo_artista === 'Instrumentista' ? `
+    <label class="form-label">Instrumentos</label>
+    <div class="chip-row" id="chipInstrumentos" style="flex-wrap:wrap;">
+      ${['Violão','Guitarra','Baixo','Bateria','Teclado/Piano','Sanfona/Acordeon','Saxofone','Trompete','Violino','Flauta','Cavaquinho','Percussão']
+        .map(inst => `<div class="chip ${(a.instrumentos || []).includes(inst) ? 'active' : ''}" data-v="${inst}">${inst}</div>`)
+        .join('')}
+    </div>` : ''}
+
+    <label class="form-label">Cachê</label>
+    <input type="text" id="cache" class="form-input" value="${escapeHtml(a.cache_info || '')}" placeholder="A combinar">
+
+    <label class="form-label">Duração média do show</label>
+    <input type="text" id="duracao" class="form-input" value="${escapeHtml(a.duracao_media || '')}" placeholder="2 a 3 horas">
+
+    <label class="form-label">WhatsApp</label>
+    <input type="text" id="whatsapp" class="form-input" value="${escapeHtml(a.whatsapp || '')}">
+
+    <label class="form-label">Shows feitos</label>
+    <input type="number" id="showsFeitos" class="form-input" value="${a.shows_feitos || ''}" placeholder="127">
+
+    <label class="form-label">Anos de estrada</label>
+    <input type="number" id="anosExperiencia" class="form-input" value="${a.anos_experiencia || ''}" placeholder="8">
+
+    <label class="form-label" style="margin-top:24px;">Redes sociais</label>
+    <label class="form-label" style="text-transform:none; font-size:12px;">Instagram</label>
+    <input type="text" id="instagram" class="form-input" value="${escapeHtml(redes.instagram || '')}" placeholder="@seu_usuario">
+    <label class="form-label" style="text-transform:none; font-size:12px;">YouTube</label>
+    <input type="text" id="youtube" class="form-input" value="${escapeHtml(redes.youtube || '')}" placeholder="link do canal">
+    <label class="form-label" style="text-transform:none; font-size:12px;">TikTok</label>
+    <input type="text" id="tiktok" class="form-input" value="${escapeHtml(redes.tiktok || '')}" placeholder="@seu_usuario">
+
+    <a href="agenda.html?id=${a.id}" class="rede-btn" style="display:block; text-align:center; margin-top:24px; border-color:var(--spotlight); color:var(--spotlight);">
+      📅 Gerenciar minha agenda de datas
+    </a>
+
+    <a href="assinatura.html?id=${a.id}" class="rede-btn" style="display:block; text-align:center; margin-top:10px; border-color:var(--spotlight); color:var(--spotlight);">
+      💳 Gerenciar minha assinatura
+    </a>
+
+    <button class="btn-primary" id="btnSalvar" onclick="salvar()">Salvar alterações</button>
+
+    <div class="danger-zone">
+      <div class="danger-title">Zona de perigo</div>
+      <div class="danger-text">Excluir seu perfil remove permanentemente suas fotos, datas e avaliações do PalcoLivre.</div>
+      <button class="btn-danger" onclick="excluirConta()">Excluir minha conta</button>
+    </div>
+  `;
+
+  document.getElementById('fotoPerfilWrap').addEventListener('click', () => {
+    document.getElementById('inputFotoPerfil').click();
+  });
+  document.getElementById('inputFotoPerfil').addEventListener('change', trocarFotoPerfil);
+
+  const btnAdd = document.getElementById('btnAddFoto');
+  if (btnAdd) {
+    btnAdd.addEventListener('click', () => document.getElementById('inputFotoGaleria').click());
+  }
+  document.getElementById('inputFotoGaleria').addEventListener('change', adicionarFotoGaleria);
+
+  const chipInstr = document.getElementById('chipInstrumentos');
+  if (chipInstr) {
+    chipInstr.addEventListener('click', e => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      chip.classList.toggle('active');
+    });
+  }
+}
+
+async function trocarFotoPerfil(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('overlayFotoPerfil').textContent = 'Enviando...';
+  try {
+    const resp = await enviarFotoPerfil(id, file);
+    artistaAtual.foto_capa_url = resp.foto_capa_url;
+    render();
+  } catch (err) {
+    mostrarToast('Não foi possível enviar a foto');
+    render();
+  }
+}
+
+async function removerFotoPerfil() {
+  if (!confirm('Tem certeza que quer remover sua foto de perfil?')) return;
+  try {
+    await excluirFotoPerfil(id);
+    artistaAtual.foto_capa_url = null;
+    render();
+  } catch (e) {
+    mostrarToast('Não foi possível remover a foto');
+  }
+}
+
+async function adicionarFotoGaleria(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (artistaAtual.fotos.length >= MAX_FOTOS_GALERIA) {
+    mostrarToast(`Você pode ter no máximo ${MAX_FOTOS_GALERIA} fotos na galeria.`);
+    return;
+  }
+
+  try {
+    const novaFoto = await enviarFotoGaleria(id, file);
+    artistaAtual.fotos.push(novaFoto);
+    render();
+  } catch (err) {
+    mostrarToast('Não foi possível enviar a foto');
+  }
+}
+
+async function removerFotoGaleria(fotoId) {
+  if (!confirm('Tem certeza que quer remover essa foto da galeria?')) return;
+  try {
+    await excluirFotoGaleria(id, fotoId);
+    artistaAtual.fotos = artistaAtual.fotos.filter(f => f.id !== fotoId);
+    render();
+  } catch (e) {
+    mostrarToast('Não foi possível remover a foto');
+  }
+}
+
+async function salvar() {
+  const btn = document.getElementById('btnSalvar');
+  btn.disabled = true;
+  btn.textContent = 'Salvando...';
+
+  try {
+   const chipInstr = document.getElementById('chipInstrumentos');
+    const instrumentosSelecionados = chipInstr
+      ? Array.from(chipInstr.querySelectorAll('.chip.active')).map(el => el.dataset.v)
+      : undefined;
+
+    await editarArtista(id, {
+      bio: document.getElementById('bio').value.trim(),
+      cache_info: document.getElementById('cache').value.trim(),
+      ...(instrumentosSelecionados ? { instrumentos: instrumentosSelecionados } : {}),
+      duracao_media: document.getElementById('duracao').value.trim(),
+      whatsapp: document.getElementById('whatsapp').value.replace(/\D/g, ''),
+      shows_feitos: Number(document.getElementById('showsFeitos').value) || 0,
+      anos_experiencia: Number(document.getElementById('anosExperiencia').value) || 0,
+      redes_sociais: {
+        instagram: document.getElementById('instagram').value.trim() || undefined,
+        youtube: document.getElementById('youtube').value.trim() || undefined,
+        tiktok: document.getElementById('tiktok').value.trim() || undefined,
+      },
+    });
+    mostrarToast('Perfil atualizado!');
+    setTimeout(() => window.location.href = `perfil.html?id=${id}`, 800);
+  } catch (e) {
+    mostrarToast(e.message || 'Não foi possível salvar');
+    btn.disabled = false;
+    btn.textContent = 'Salvar alterações';
+  }
+}
+
+async function excluirConta() {
+  if (!confirm(`Tem certeza que quer excluir o perfil de ${artistaAtual.nome_artistico}? Isso vai apagar todas as fotos, datas e avaliações. Essa ação não pode ser desfeita.`)) return;
+  try {
+    await excluirArtista(id);
+    window.location.href = 'index.html';
+  } catch (e) {
+    mostrarToast(e.message || 'Não foi possível excluir o perfil');
+  }
+}
+
+carregar();
+</script>
+
+</body>
+</html>

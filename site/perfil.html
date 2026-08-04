@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil do Artista — PalcoLivre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="conteudo">
+  <div class="loading" style="padding-top:60px;">Carregando perfil...</div>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+const id = getQueryParam('id');
+
+async function carregar() {
+  const container = document.getElementById('conteudo');
+  if (!id) {
+    container.innerHTML = '<div class="empty-msg">Perfil não encontrado.</div>';
+    return;
+  }
+
+  try {
+    const a = await buscarPerfilArtista(id);
+    document.title = `${a.nome_artistico} — PalcoLivre`;
+
+    // Só mostra o lápis de editar e o link de assinatura pra quem é dono
+    // de verdade desse perfil (mesmo navegador que criou o cadastro).
+    const souDono = a.device_id && a.device_id === getDeviceId();
+
+    const notaMedia = a.avaliacoes.length > 0
+      ? (a.avaliacoes.reduce((s, av) => s + av.nota, 0) / a.avaliacoes.length).toFixed(1)
+      : '—';
+
+    let html = `
+      <div class="hero" style="background-image:url('${a.foto_capa_url || ''}')">
+        <div class="hero-top">
+          <a href="index.html" class="icon-btn">←</a>
+          ${souDono ? `
+            <div style="display:flex; gap:8px;">
+              <a href="assinatura.html?id=${a.id}" class="icon-btn">💳</a>
+              <a href="editar.html?id=${a.id}" class="icon-btn">✏️</a>
+            </div>` : ''}
+        </div>
+        <div class="hero-content">
+          ${a.verificado ? '<div class="verified-badge">✓ Perfil verificado</div>' : ''}
+          <div class="artist-title">${escapeHtml(a.nome_artistico)}</div>
+          <div class="artist-loc">
+            ${escapeHtml(a.cidade)}, ${escapeHtml(a.estado)}
+            ${a.raio_km ? ` · Atende até ${a.raio_km} km` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <div class="tags-row">
+          ${(a.generos || []).map(g => `<div class="tag">${escapeHtml(g)}</div>`).join('')}
+        </div>
+
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-num">${notaMedia}</div><div class="stat-label">Avaliação</div></div>
+          <div class="stat-box"><div class="stat-num">${a.shows_feitos || 0}</div><div class="stat-label">Shows feitos</div></div>
+          <div class="stat-box"><div class="stat-num">${a.anos_experiencia || '—'}</div><div class="stat-label">Anos de estrada</div></div>
+        </div>
+
+        <div class="section">
+          <div class="eyebrow">PRÓXIMAS DATAS</div>
+          <div class="avail-strip">
+            ${a.datas.length === 0 ? '<div class="artist-sub">Nenhuma data cadastrada ainda.</div>' :
+              a.datas.map(d => {
+                const { dow, num, mon } = formatarDataCurta(d.data);
+                const livre = d.status === 'livre';
+                return `<div class="date-card ${livre ? 'free' : ''}">
+                  <div class="dow">${dow}</div><div class="dnum">${num}</div><div class="dmon">${mon}</div>
+                  <div class="dstatus">${livre ? 'Livre' : 'Fechado'}</div>
+                </div>`;
+              }).join('')}
+          </div>
+          ${a.datas.some(d => d.observacao) ? `
+            <div style="margin-top:10px; display:flex; flex-direction:column; gap:4px;">
+              ${a.datas.filter(d => d.observacao).map(d => {
+                const { num, mon } = formatarDataCurta(d.data);
+                return `<div style="color:var(--muted); font-size:12px; line-height:18px;">
+                  <span style="color:var(--spotlight); font-weight:700;">${num} ${mon}:</span> ${escapeHtml(d.observacao)}
+                </div>`;
+              }).join('')}
+            </div>` : ''}
+        </div>
+
+        ${a.fotos.length > 0 ? `
+        <div class="section">
+          <div class="eyebrow">FOTOS</div>
+          <div class="gallery-strip">
+            ${a.fotos.map(f => `<img src="${f.url}" onclick="abrirImagemAmpliada('${f.url}')" style="cursor:pointer;">`).join('')}
+          </div>
+        </div>` : ''}
+
+        ${a.bio ? `
+        <div class="section">
+          <div class="eyebrow">SOBRE</div>
+          <p class="bio-text">${escapeHtml(a.bio)}</p>
+        </div>` : ''}
+
+        ${renderRedesSociais(a.redes_sociais)}
+
+        <div class="section">
+          <div class="eyebrow">FICHA TÉCNICA</div>
+          <div class="info-list">
+            ${a.formato ? `<div class="info-row"><span class="info-label">Formato</span><span class="info-value">${escapeHtml(a.formato)}</span></div>` : ''}
+            <div class="info-row"><span class="info-label">Equipamento próprio</span><span class="info-value">${a.equipamento_proprio ? 'Sim' : 'Não'}</span></div>
+            ${a.duracao_media ? `<div class="info-row"><span class="info-label">Duração média</span><span class="info-value">${escapeHtml(a.duracao_media)}</span></div>` : ''}
+            ${a.cache_info ? `<div class="info-row"><span class="info-label">Cachê</span><span class="info-value">${escapeHtml(a.cache_info)}</span></div>` : ''}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="eyebrow">AVALIAÇÕES <a href="avaliar.html?id=${a.id}">+ Deixar avaliação</a></div>
+          ${a.avaliacoes.length === 0 ? '<div class="artist-sub">Ainda não há avaliações.</div>' :
+            a.avaliacoes.map(av => `
+              <div class="review-card">
+                <div class="review-top">
+                  <span class="review-name">${escapeHtml(av.nome_contratante)}</span>
+                  <span class="stars">${'★'.repeat(av.nota)}${'☆'.repeat(5 - av.nota)}</span>
+                </div>
+                ${av.comentario ? `<p class="review-text">${escapeHtml(av.comentario)}</p>` : ''}
+                ${av.resposta_artista ? `
+                  <div class="reply-box">
+                    <div class="reply-head">🎤 Resposta de ${escapeHtml(a.nome_artistico)}</div>
+                    <div class="reply-text">${escapeHtml(av.resposta_artista)}</div>
+                  </div>` : ''}
+                <span class="report-link" onclick="denunciar(${av.id})">🚩 Denunciar avaliação</span>
+              </div>
+            `).join('')}
+        </div>
+
+        <div class="cta-row">
+          <a href="https://wa.me/${a.whatsapp}?text=${encodeURIComponent('Olá ' + a.nome_artistico + '! Vi seu perfil no PalcoLivre e gostaria de saber sobre disponibilidade para um show.')}"
+             target="_blank" class="cta-primary" style="display:flex;align-items:center;justify-content:center;">
+            📲 Chamar no WhatsApp
+          </a>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-msg">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderRedesSociais(redes) {
+  if (!redes) return '';
+  const links = [];
+  if (redes.instagram) links.push(`<a href="${montarLinkRede('instagram', redes.instagram)}" target="_blank" class="rede-btn">📷 Instagram</a>`);
+  if (redes.youtube) links.push(`<a href="${montarLinkRede('youtube', redes.youtube)}" target="_blank" class="rede-btn">▶️ YouTube</a>`);
+  if (redes.tiktok) links.push(`<a href="${montarLinkRede('tiktok', redes.tiktok)}" target="_blank" class="rede-btn">🎵 TikTok</a>`);
+  if (links.length === 0) return '';
+  return `<div class="section"><div class="eyebrow">REDES SOCIAIS</div><div class="redes-row">${links.join('')}</div></div>`;
+}
+
+async function denunciar(avaliacaoId) {
+  try {
+    await denunciarAvaliacao(avaliacaoId);
+    mostrarToast('Avaliação denunciada. Nossa equipe vai revisar.');
+  } catch (e) {
+    mostrarToast('Não foi possível denunciar agora.');
+  }
+}
+
+function abrirImagemAmpliada(url) {
+  const modal = document.createElement('div');
+  modal.id = 'modalImagem';
+  modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.92); z-index:200; display:flex; align-items:center; justify-content:center;';
+  modal.onclick = () => modal.remove();
+  modal.innerHTML = `
+    <div style="position:absolute; top:20px; right:20px; width:40px; height:40px; border-radius:20px; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; cursor:pointer;">✕</div>
+    <img src="${url}" style="max-width:92%; max-height:85%; object-fit:contain; border-radius:8px;">
+  `;
+  document.body.appendChild(modal);
+}
+
+carregar();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Criar perfil de artista — PalcoLivre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .foto-wrap{
+    width:110px; height:110px; border-radius:55px; overflow:hidden;
+    margin: 0 auto 8px; cursor:pointer; position:relative;
+  }
+  .foto-wrap img{ width:100%; height:100%; object-fit:cover; }
+  .foto-placeholder{
+    width:100%; height:100%; background: var(--surface); border:1px dashed var(--line);
+    display:flex; align-items:center; justify-content:center; text-align:center;
+    color: var(--spotlight); font-size:11px; font-weight:700;
+  }
+  .sugestoes-box{
+    background: var(--surface); border:1px solid var(--line); border-radius:12px;
+    margin-top:6px; overflow:hidden;
+  }
+  .sugestao-item{ padding:11px 14px; border-bottom:1px solid var(--line); cursor:pointer; font-size:13.5px; font-weight:600; }
+  .sugestao-item:last-child{ border-bottom:none; }
+  .sugestao-item:hover{ background: var(--surface-2); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="back">← Voltar</a>
+</div>
+
+<div class="wrap" id="conteudo" style="padding-top:10px;">
+  <div class="loading">Verificando...</div>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+let cidadesConhecidas = [];
+let fotoArquivo = null;
+
+async function iniciar() {
+  const deviceId = getDeviceId();
+  const meuId = await buscarMeuPerfilId(deviceId);
+
+  if (meuId) {
+    document.getElementById('conteudo').innerHTML = `
+      <div class="empty-msg">
+        Você já tem um perfil de artista neste navegador.<br><br>
+        <a href="perfil.html?id=${meuId}" class="rede-btn" style="display:inline-block;">Ver meu perfil</a>
+      </div>`;
+    return;
+  }
+
+  buscarCidades().then(c => cidadesConhecidas = c).catch(() => {});
+  renderFormulario();
+}
+
+function renderFormulario() {
+  document.getElementById('conteudo').innerHTML = `
+    <h2 style="font-family:'Fraunces',serif; font-size:24px; margin-bottom:16px;">Criar perfil de artista</h2>
+
+    <div class="foto-wrap" id="fotoWrap">
+      <div class="foto-placeholder">📷<br>Adicionar foto</div>
+    </div>
+    <input type="file" id="inputFoto" accept="image/*" style="display:none;">
+
+    <label class="form-label">Nome artístico *</label>
+    <input type="text" id="nome" class="form-input" placeholder="Ex: Renan Duarte">
+
+   <label class="form-label">Tipo de artista *</label>
+    <div class="chip-row" id="chipTipo" style="flex-wrap:wrap;">
+      <div class="chip active" data-v="Cantor">Cantor</div>
+      <div class="chip" data-v="Instrumentista">Instrumentista</div>
+      <div class="chip" data-v="Banda">Banda</div>
+      <div class="chip" data-v="Dupla">Dupla</div>
+      <div class="chip" data-v="DJ">DJ</div>
+    </div>
+
+    <div id="blocoInstrumentos" style="display:none;">
+      <label class="form-label">Instrumentos (toque para selecionar um ou mais)</label>
+      <div class="chip-row" id="chipInstrumentos" style="flex-wrap:wrap;">
+        <div class="chip" data-v="Violão">Violão</div>
+        <div class="chip" data-v="Guitarra">Guitarra</div>
+        <div class="chip" data-v="Baixo">Baixo</div>
+        <div class="chip" data-v="Bateria">Bateria</div>
+        <div class="chip" data-v="Teclado/Piano">Teclado/Piano</div>
+        <div class="chip" data-v="Sanfona/Acordeon">Sanfona/Acordeon</div>
+        <div class="chip" data-v="Saxofone">Saxofone</div>
+        <div class="chip" data-v="Trompete">Trompete</div>
+        <div class="chip" data-v="Violino">Violino</div>
+        <div class="chip" data-v="Flauta">Flauta</div>
+        <div class="chip" data-v="Cavaquinho">Cavaquinho</div>
+        <div class="chip" data-v="Percussão">Percussão</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div style="position:relative;">
+        <label class="form-label">Cidade *</label>
+        <input type="text" id="cidade" class="form-input" placeholder="Cláudio" autocomplete="off">
+        <div id="sugestoesCidade"></div>
+      </div>
+      <div style="max-width:90px;">
+        <label class="form-label">UF *</label>
+        <input type="text" id="estado" class="form-input" placeholder="MG" maxlength="2">
+      </div>
+    </div>
+
+    <label class="form-label">WhatsApp (com DDD) *</label>
+    <input type="text" id="whatsapp" class="form-input" placeholder="37999999999">
+
+    <label class="form-label">Gêneros musicais (separados por vírgula)</label>
+    <input type="text" id="generos" class="form-input" placeholder="Sertanejo raiz, MPB">
+
+    <label class="form-label">Bio</label>
+    <textarea id="bio" class="form-textarea" placeholder="Conte um pouco sobre sua trajetória..."></textarea>
+
+    <label class="form-label">Formato</label>
+    <div class="chip-row" id="chipFormato">
+      <div class="chip active" data-v="Solo">Solo</div>
+      <div class="chip" data-v="Dupla">Dupla</div>
+      <div class="chip" data-v="Banda">Banda</div>
+    </div>
+
+    <label class="form-label">
+      <input type="checkbox" id="equipamento"> Tenho equipamento próprio (som/microfone)
+    </label>
+
+    <label class="form-label">Duração média do show</label>
+    <input type="text" id="duracao" class="form-input" placeholder="2 a 3 horas">
+
+    <label class="form-label">Cachê</label>
+    <input type="text" id="cache" class="form-input" placeholder="A combinar">
+
+    <label class="form-label">Anos de estrada</label>
+    <input type="number" id="anos" class="form-input" placeholder="8">
+
+    <label class="form-label">Shows feitos</label>
+    <input type="number" id="showsFeitos" class="form-input" placeholder="127">
+
+    <label class="form-label" style="margin-top:24px;">Redes sociais</label>
+    <label class="form-label" style="text-transform:none; font-size:12px;">Instagram</label>
+    <input type="text" id="instagram" class="form-input" placeholder="@seu_usuario">
+    <label class="form-label" style="text-transform:none; font-size:12px;">YouTube</label>
+    <input type="text" id="youtube" class="form-input" placeholder="link do canal">
+    <label class="form-label" style="text-transform:none; font-size:12px;">TikTok</label>
+    <input type="text" id="tiktok" class="form-input" placeholder="@seu_usuario">
+
+    <button class="btn-primary" id="btnSalvar" onclick="salvar()">Criar meu perfil</button>
+  `;
+
+  document.getElementById('chipTipo').addEventListener('click', e => {
+    selecionarChip(e, 'chipTipo');
+    document.getElementById('blocoInstrumentos').style.display =
+      valorChipAtivo('chipTipo') === 'Instrumentista' ? 'block' : 'none';
+  });
+  document.getElementById('chipFormato').addEventListener('click', e => selecionarChip(e, 'chipFormato'));
+
+  document.getElementById('chipInstrumentos').addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    chip.classList.toggle('active'); // multi-seleção: cada clique liga/desliga
+  });
+
+  document.getElementById('fotoWrap').addEventListener('click', () => document.getElementById('inputFoto').click());
+  document.getElementById('inputFoto').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    fotoArquivo = file;
+    const url = URL.createObjectURL(file);
+    document.getElementById('fotoWrap').innerHTML = `<img src="${url}">`;
+  });
+
+  const inputCidade = document.getElementById('cidade');
+  inputCidade.addEventListener('input', () => renderSugestoesCidade(inputCidade.value));
+  inputCidade.addEventListener('focus', () => renderSugestoesCidade(inputCidade.value));
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#sugestoesCidade') && e.target.id !== 'cidade') {
+      document.getElementById('sugestoesCidade').innerHTML = '';
+    }
+  });
+}
+
+function renderSugestoesCidade(texto) {
+  const container = document.getElementById('sugestoesCidade');
+  if (!texto) { container.innerHTML = ''; return; }
+
+  const filtradas = cidadesConhecidas.filter(c =>
+    c.cidade.toLowerCase().startsWith(texto.toLowerCase())
+  ).slice(0, 5);
+
+  if (filtradas.length === 0) { container.innerHTML = ''; return; }
+
+  container.innerHTML = `<div class="sugestoes-box">${filtradas.map(c => `
+    <div class="sugestao-item" onclick="escolherCidade('${escapeHtml(c.cidade)}','${escapeHtml(c.estado)}')">
+      ${escapeHtml(c.cidade)}, ${escapeHtml(c.estado)}
+    </div>`).join('')}</div>`;
+}
+
+function escolherCidade(cidade, estado) {
+  document.getElementById('cidade').value = cidade;
+  document.getElementById('estado').value = estado;
+  document.getElementById('sugestoesCidade').innerHTML = '';
+}
+
+function selecionarChip(e, grupoId) {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  document.querySelectorAll(`#${grupoId} .chip`).forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+}
+
+function valorChipAtivo(grupoId) {
+  return document.querySelector(`#${grupoId} .chip.active`).dataset.v;
+}
+
+async function salvar() {
+  const nome = document.getElementById('nome').value.trim();
+  const cidade = document.getElementById('cidade').value.trim();
+  const estado = document.getElementById('estado').value.trim().toUpperCase();
+  const whatsapp = document.getElementById('whatsapp').value.replace(/\D/g, '');
+
+  if (!nome) return mostrarToast('Informe o nome artístico');
+  if (!cidade) return mostrarToast('Informe a cidade');
+  if (estado.length !== 2) return mostrarToast('Informe o estado (2 letras, ex: MG)');
+  if (!whatsapp) return mostrarToast('Informe o WhatsApp');
+
+  const btn = document.getElementById('btnSalvar');
+  btn.disabled = true;
+  btn.textContent = 'Criando...';
+
+  try {
+   const instrumentosSelecionados = Array.from(
+      document.querySelectorAll('#chipInstrumentos .chip.active')
+    ).map(el => el.dataset.v);
+
+    const novoArtista = await criarArtista({
+      nome_artistico: nome,
+      tipo_artista: valorChipAtivo('chipTipo'),
+      instrumentos: instrumentosSelecionados,
+      cidade,
+      estado,
+      whatsapp,
+      generos: document.getElementById('generos').value.split(',').map(g => g.trim()).filter(Boolean),
+      bio: document.getElementById('bio').value.trim() || undefined,
+      formato: valorChipAtivo('chipFormato'),
+      equipamento_proprio: document.getElementById('equipamento').checked,
+      duracao_media: document.getElementById('duracao').value.trim() || undefined,
+      cache_info: document.getElementById('cache').value.trim() || undefined,
+      anos_experiencia: document.getElementById('anos').value ? Number(document.getElementById('anos').value) : undefined,
+      shows_feitos: document.getElementById('showsFeitos').value ? Number(document.getElementById('showsFeitos').value) : undefined,
+      redes_sociais: {
+        instagram: document.getElementById('instagram').value.trim() || undefined,
+        youtube: document.getElementById('youtube').value.trim() || undefined,
+        tiktok: document.getElementById('tiktok').value.trim() || undefined,
+      },
+      device_id: getDeviceId(),
+    });
+
+    // Se escolheu foto, envia agora que o perfil já existe (não bloqueia o cadastro se falhar)
+    if (fotoArquivo) {
+      try { await enviarFotoPerfil(novoArtista.id, fotoArquivo); } catch (e) {}
+    }
+
+    window.location.href = `perfil.html?id=${novoArtista.id}`;
+  } catch (e) {
+    mostrarToast(e.message || 'Não foi possível criar o perfil');
+    btn.disabled = false;
+    btn.textContent = 'Criar meu perfil';
+  }
+}
+
+iniciar();
+</script>
+
+</body>
+</html>

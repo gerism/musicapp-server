@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deixar avaliação — PalcoLivre</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <a href="#" id="linkVoltar" class="back">← Voltar</a>
+</div>
+
+<div class="wrap" style="padding-top:10px;">
+  <h2 style="font-family:'Fraunces',serif; font-size:24px; margin-bottom:16px;">Deixar avaliação</h2>
+
+  <label class="form-label">Seu nome ou nome do local/evento</label>
+  <input type="text" id="nome" class="form-input" placeholder="Ex: Buffet Vale Verde">
+
+  <label class="form-label">Quantas estrelas?</label>
+  <div class="stars-input" id="starsInput">
+    <span data-v="1">★</span>
+    <span data-v="2">★</span>
+    <span data-v="3">★</span>
+    <span data-v="4">★</span>
+    <span data-v="5">★</span>
+  </div>
+
+  <label class="form-label">Comentário (opcional)</label>
+  <textarea id="comentario" class="form-textarea" placeholder="Como foi a experiência com o show?"></textarea>
+
+  <button class="btn-primary" id="btnEnviar" onclick="enviar()">Enviar avaliação</button>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+const id = getQueryParam('id');
+document.getElementById('linkVoltar').href = `perfil.html?id=${id}`;
+
+let notaAtual = 5;
+
+function pintarEstrelas() {
+  document.querySelectorAll('#starsInput span').forEach(el => {
+    el.classList.toggle('active', Number(el.dataset.v) <= notaAtual);
+  });
+}
+pintarEstrelas();
+
+document.getElementById('starsInput').addEventListener('click', (e) => {
+  if (e.target.tagName !== 'SPAN') return;
+  notaAtual = Number(e.target.dataset.v);
+  pintarEstrelas();
+});
+
+async function enviar() {
+  const nome = document.getElementById('nome').value.trim();
+  if (!nome) return mostrarToast('Informe seu nome ou o nome do local/evento');
+
+  const btn = document.getElementById('btnEnviar');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  try {
+    await enviarAvaliacao(id, {
+      nome_contratante: nome,
+      nota: notaAtual,
+      comentario: document.getElementById('comentario').value.trim() || undefined,
+    });
+    mostrarToast('Avaliação enviada, obrigado!');
+    setTimeout(() => window.location.href = `perfil.html?id=${id}`, 1000);
+  } catch (e) {
+    mostrarToast(e.message || 'Não foi possível enviar a avaliação');
+    btn.disabled = false;
+    btn.textContent = 'Enviar avaliação';
+  }
+}
+</script>
+
+</body>
+</html>

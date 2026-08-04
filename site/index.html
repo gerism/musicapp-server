@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PalcoLivre — Encontre artistas para seu evento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<img src="assets/banner.png" alt="PalcoLivre" class="banner">
+
+<div class="wrap">
+  <div id="contadorArtistas" style="color:var(--muted); font-size:12px; font-weight:600; margin-top:10px;"></div>
+
+  <div class="search-box">
+    <span>🔍</span>
+    <input type="text" id="inputBusca" placeholder="Buscar por nome ou cidade...">
+  </div>
+
+  <div class="chip-row" id="chipRow">
+    <div class="chip active" data-tipo="">Todos</div>
+    <div class="chip" data-tipo="Cantor">Cantor</div>
+    <div class="chip" data-tipo="Instrumentista">Instrumentista</div>
+    <div class="chip" data-tipo="Banda">Banda</div>
+    <div class="chip" data-tipo="Dupla">Dupla</div>
+    <div class="chip" data-tipo="DJ">DJ</div>
+  </div>
+
+  <div style="text-align:right; margin-bottom:8px;">
+    <a href="cadastro.html" class="rede-btn" style="display:inline-block;">+ Criar meu perfil</a>
+  </div>
+
+  <div id="listaArtistas"></div>
+
+  <div style="text-align:center; margin-top:40px; padding-top:24px; border-top:1px solid var(--line);">
+    <p style="color:var(--muted); font-size:12.5px; margin-bottom:10px;">
+      Prefere usar pelo celular?
+    </p>
+    <!-- TODO: trocar pelo link real assim que o app for publicado na Play Store -->
+    <a href="https://play.google.com/store/apps/details?id=SUBSTITUA_PELO_PACOTE_DO_APP"
+       target="_blank" class="rede-btn" style="display:inline-block;">
+      📲 Baixar o app na Play Store
+    </a>
+  </div>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/api.js"></script>
+<script>
+let tipoAtivo = '';
+let timerBusca = null;
+
+buscarContagemArtistas()
+  .then(res => {
+    document.getElementById('contadorArtistas').textContent =
+      `🎤 ${res.total} artista${res.total === 1 ? '' : 's'} cadastrado${res.total === 1 ? '' : 's'}`;
+  })
+  .catch(() => {}); // se falhar, simplesmente não mostra
+
+async function carregarLista() {
+  const container = document.getElementById('listaArtistas');
+  container.innerHTML = '<div class="loading">Carregando...</div>';
+
+  try {
+    const busca = document.getElementById('inputBusca').value.trim();
+    const artistas = await buscarArtistas({ busca: busca || undefined, tipo: tipoAtivo || undefined });
+
+    if (artistas.length === 0) {
+      container.innerHTML = '<div class="empty-msg">Nenhum artista encontrado.</div>';
+      return;
+    }
+
+    const grupos = {};
+    artistas.forEach(a => {
+      const letra = a.nome_artistico.charAt(0).toUpperCase();
+      if (!grupos[letra]) grupos[letra] = [];
+      grupos[letra].push(a);
+    });
+
+    let html = '';
+    Object.keys(grupos).sort().forEach(letra => {
+      html += `<div class="letter-head">${letra}</div>`;
+      grupos[letra].forEach(a => {
+        const cor = TYPE_COLORS[a.tipo_artista] || '#a596b3';
+        html += `
+          <a href="perfil.html?id=${a.id}" class="artist-row">
+            <img src="${a.foto_capa_url || ''}" onerror="this.style.background='#2d2236'">
+            <div class="artist-info">
+              <div class="artist-name">${escapeHtml(a.nome_artistico)} ${a.verificado ? '<span class="verified-dot">✓</span>' : ''}</div>
+              <div class="artist-meta">
+                <span class="type-pill" style="background:${cor}22; color:${cor};">${a.tipo_artista}</span>
+                <span class="artist-sub">${a.generos && a.generos[0] ? escapeHtml(a.generos[0]) + ' · ' : ''}${escapeHtml(a.cidade)}, ${escapeHtml(a.estado)}</span>
+              </div>
+            </div>
+          </a>`;
+      });
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = `<div class="empty-msg">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById('inputBusca').addEventListener('input', () => {
+  clearTimeout(timerBusca);
+  timerBusca = setTimeout(carregarLista, 400);
+});
+
+document.getElementById('chipRow').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  tipoAtivo = chip.dataset.tipo;
+  carregarLista();
+});
+
+carregarLista();
+</script>
+
+</body>
+</html>
