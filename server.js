@@ -550,9 +550,25 @@ app.post('/artistas/:id/datas', async (req, res) => {
   }
 });
 
+// Excluir uma data da agenda (data vem na URL no formato YYYY-MM-DD)
+app.delete('/artistas/:id/datas/:data', async (req, res) => {
+  const { id, data } = req.params;
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM datas_disponiveis WHERE artista_id = $1 AND data = $2 RETURNING data',
+      [id, data],
+    );
+    if (rows.length === 0) return res.status(404).json({ erro: 'Data não encontrada' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao excluir data:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao excluir data' });
+  }
+});
+
 // ============================================
 // AVALIAÇÕES
-// ============================================
+// =======================================================================================
 
 app.post('/artistas/:id/avaliacoes', async (req, res) => {
   const { id } = req.params;
