@@ -1,0 +1,40 @@
+PalcoLivre — arquivos atualizados do site
+==========================================
+
+O QUE TEM AQUI:
+- index.html      (lista de artistas, com placeholder de foto + instrumento na etiqueta)
+- perfil.html      (perfil completo, sem "Shows feitos", com placeholder de foto)
+- cadastro.html     (sem "Shows feitos")
+- editar.html      (sem "Shows feitos")
+- agenda.html      (com botão de excluir data + ações otimistas, mais rápido)
+- avaliar.html      (sem mudanças, igual já estava)
+- assinatura.html    (sem mudanças, igual já estava)
+- js/api.js       (retry mais forte + função excluirData nova)
+
+O QUE NÃO ESTÁ AQUI (você já tem, não mexemos):
+- css/style.css
+- js/common.js
+- assets/banner.png
+
+VOCÊ AINDA PRECISA:
+1. Copiar o arquivo avatar-placeholder.png (o mesmo que você já colocou no
+   app, em D:\PalcoLivre\src\assets\) para dentro de site/assets/ também.
+   Sem esse arquivo, os placeholders de foto vão dar erro 404.
+
+COMO USAR:
+1. Extrai esse zip.
+2. Copia TODOS os arquivos e pastas de dentro pra:
+   D:\PalcoLivre\MusicApp-server\site\
+   (substituindo os arquivos antigos com o mesmo nome — pode confirmar
+   "Substituir" quando o Windows perguntar)
+3. Copia o avatar-placeholder.png pra site\assets\ (ver acima).
+4. Depois disso, no CMD:
+
+   cd /d D:\PalcoLivre\MusicApp-server
+   node -c server.js
+   git add .
+   git commit -m "Sincroniza site com melhorias do app"
+   git push
+
+5. A Railway faz o deploy automático. Testa em:
+   https://musicapp-server-production.up.railway.app
