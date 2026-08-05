@@ -3,6 +3,13 @@
 
 const BASE_URL = 'https://musicapp-server-production.up.railway.app';
 
+// Quantas vezes tenta de novo se a chamada falhar, e quanto tempo espera
+// entre cada tentativa. O servidor no Railway pode demorar pra responder
+// logo depois de um deploy ou período parado — por isso o tempo de espera
+// cresce a cada tentativa, em vez de desistir rápido demais.
+const TENTATIVAS_MAX = 6;
+const ESPERA_BASE_MS = 2500;
+
 async function apiRequest(path, options = {}, tentativa = 1) {
   try {
     const resp = await fetch(`${BASE_URL}${path}`, {
@@ -16,9 +23,9 @@ async function apiRequest(path, options = {}, tentativa = 1) {
     }
     return resp.json();
   } catch (e) {
-    if (tentativa === 1) {
-      await new Promise(r => setTimeout(r, 1800));
-      return apiRequest(path, options, 2);
+    if (tentativa < TENTATIVAS_MAX) {
+      await new Promise(r => setTimeout(r, ESPERA_BASE_MS * tentativa));
+      return apiRequest(path, options, tentativa + 1);
     }
     throw e;
   }
@@ -81,6 +88,10 @@ function salvarData(artistaId, data, status = 'livre', observacao) {
   });
 }
 
+function excluirData(artistaId, data) {
+  return apiRequest(`/artistas/${artistaId}/datas/${data}`, { method: 'DELETE' });
+}
+
 // ---------- Avaliações ----------
 
 function enviarAvaliacao(artistaId, dados) {
@@ -107,9 +118,9 @@ async function enviarFotoPerfil(artistaId, file, tentativa = 1) {
     if (!resp.ok) throw new Error('Erro ao enviar foto de perfil');
     return resp.json();
   } catch (e) {
-    if (tentativa === 1) {
-      await new Promise(r => setTimeout(r, 1800));
-      return enviarFotoPerfil(artistaId, file, 2);
+    if (tentativa < TENTATIVAS_MAX) {
+      await new Promise(r => setTimeout(r, ESPERA_BASE_MS * tentativa));
+      return enviarFotoPerfil(artistaId, file, tentativa + 1);
     }
     throw e;
   }
@@ -126,9 +137,9 @@ async function enviarFotoGaleria(artistaId, file, tentativa = 1) {
     if (!resp.ok) throw new Error('Erro ao enviar foto');
     return resp.json();
   } catch (e) {
-    if (tentativa === 1) {
-      await new Promise(r => setTimeout(r, 1800));
-      return enviarFotoGaleria(artistaId, file, 2);
+    if (tentativa < TENTATIVAS_MAX) {
+      await new Promise(r => setTimeout(r, ESPERA_BASE_MS * tentativa));
+      return enviarFotoGaleria(artistaId, file, tentativa + 1);
     }
     throw e;
   }

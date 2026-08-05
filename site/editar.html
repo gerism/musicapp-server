@@ -61,7 +61,7 @@ function render() {
 
     <label class="form-label">Foto de perfil</label>
     <div class="photo-perfil-wrap" id="fotoPerfilWrap">
-      <img src="${a.foto_capa_url || ''}" id="imgFotoPerfil">
+      <img src="${a.foto_capa_url || 'assets/avatar-placeholder.png'}" id="imgFotoPerfil">
       <div class="photo-perfil-overlay" id="overlayFotoPerfil">📷 Trocar foto</div>
       ${a.foto_capa_url ? '<div class="photo-delete-badge" onclick="event.stopPropagation(); removerFotoPerfil()">✕</div>' : ''}
     </div>
@@ -100,9 +100,6 @@ function render() {
 
     <label class="form-label">WhatsApp</label>
     <input type="text" id="whatsapp" class="form-input" value="${escapeHtml(a.whatsapp || '')}">
-
-    <label class="form-label">Shows feitos</label>
-    <input type="number" id="showsFeitos" class="form-input" value="${a.shows_feitos || ''}" placeholder="127">
 
     <label class="form-label">Anos de estrada</label>
     <input type="number" id="anosExperiencia" class="form-input" value="${a.anos_experiencia || ''}" placeholder="8">
@@ -224,7 +221,6 @@ async function salvar() {
       ...(instrumentosSelecionados ? { instrumentos: instrumentosSelecionados } : {}),
       duracao_media: document.getElementById('duracao').value.trim(),
       whatsapp: document.getElementById('whatsapp').value.replace(/\D/g, ''),
-      shows_feitos: Number(document.getElementById('showsFeitos').value) || 0,
       anos_experiencia: Number(document.getElementById('anosExperiencia').value) || 0,
       redes_sociais: {
         instagram: document.getElementById('instagram').value.trim() || undefined,

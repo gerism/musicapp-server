@@ -60,6 +60,18 @@ buscarContagemArtistas()
   })
   .catch(() => {}); // se falhar, simplesmente não mostra
 
+// Monta o texto da etiqueta: "Instrumentista" vira "Instrumentista · Baixo",
+// e se tocar mais de um instrumento, acrescenta "+1", "+2" etc.
+function labelTipoArtista(a) {
+  if (a.tipo_artista === 'Instrumentista' && a.instrumentos && a.instrumentos.length) {
+    const [primeiro, ...resto] = a.instrumentos;
+    return resto.length > 0
+      ? `${a.tipo_artista} · ${primeiro} +${resto.length}`
+      : `${a.tipo_artista} · ${primeiro}`;
+  }
+  return a.tipo_artista;
+}
+
 async function carregarLista() {
   const container = document.getElementById('listaArtistas');
   container.innerHTML = '<div class="loading">Carregando...</div>';
@@ -85,13 +97,14 @@ async function carregarLista() {
       html += `<div class="letter-head">${letra}</div>`;
       grupos[letra].forEach(a => {
         const cor = TYPE_COLORS[a.tipo_artista] || '#a596b3';
+        const labelTipo = labelTipoArtista(a);
         html += `
           <a href="perfil.html?id=${a.id}" class="artist-row">
-            <img src="${a.foto_capa_url || ''}" onerror="this.style.background='#2d2236'">
+            <img src="${a.foto_capa_url || 'assets/avatar-placeholder.png'}" onerror="this.src='assets/avatar-placeholder.png'">
             <div class="artist-info">
               <div class="artist-name">${escapeHtml(a.nome_artistico)} ${a.verificado ? '<span class="verified-dot">✓</span>' : ''}</div>
               <div class="artist-meta">
-                <span class="type-pill" style="background:${cor}22; color:${cor};">${a.tipo_artista}</span>
+                <span class="type-pill" style="background:${cor}22; color:${cor};">${escapeHtml(labelTipo)}</span>
                 <span class="artist-sub">${a.generos && a.generos[0] ? escapeHtml(a.generos[0]) + ' · ' : ''}${escapeHtml(a.cidade)}, ${escapeHtml(a.estado)}</span>
               </div>
             </div>

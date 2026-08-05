@@ -140,9 +140,6 @@ function renderFormulario() {
     <label class="form-label">Anos de estrada</label>
     <input type="number" id="anos" class="form-input" placeholder="8">
 
-    <label class="form-label">Shows feitos</label>
-    <input type="number" id="showsFeitos" class="form-input" placeholder="127">
-
     <label class="form-label" style="margin-top:24px;">Redes sociais</label>
     <label class="form-label" style="text-transform:none; font-size:12px;">Instagram</label>
     <input type="text" id="instagram" class="form-input" placeholder="@seu_usuario">
@@ -253,7 +250,6 @@ async function salvar() {
       duracao_media: document.getElementById('duracao').value.trim() || undefined,
       cache_info: document.getElementById('cache').value.trim() || undefined,
       anos_experiencia: document.getElementById('anos').value ? Number(document.getElementById('anos').value) : undefined,
-      shows_feitos: document.getElementById('showsFeitos').value ? Number(document.getElementById('showsFeitos').value) : undefined,
       redes_sociais: {
         instagram: document.getElementById('instagram').value.trim() || undefined,
         youtube: document.getElementById('youtube').value.trim() || undefined,

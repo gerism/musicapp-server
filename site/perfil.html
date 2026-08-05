@@ -19,6 +19,13 @@
 <script>
 const id = getQueryParam('id');
 
+function labelTipoArtista(a) {
+  if (a.tipo_artista === 'Instrumentista' && a.instrumentos && a.instrumentos.length) {
+    return a.instrumentos.join(', ');
+  }
+  return '';
+}
+
 async function carregar() {
   const container = document.getElementById('conteudo');
   if (!id) {
@@ -39,7 +46,7 @@ async function carregar() {
       : '—';
 
     let html = `
-      <div class="hero" style="background-image:url('${a.foto_capa_url || ''}')">
+      <div class="hero" style="background-image:url('${a.foto_capa_url || 'assets/avatar-placeholder.png'}')">
         <div class="hero-top">
           <a href="index.html" class="icon-btn">←</a>
           ${souDono ? `
@@ -61,11 +68,11 @@ async function carregar() {
       <div class="wrap">
         <div class="tags-row">
           ${(a.generos || []).map(g => `<div class="tag">${escapeHtml(g)}</div>`).join('')}
+          ${labelTipoArtista(a) ? `<div class="tag">${escapeHtml(labelTipoArtista(a))}</div>` : ''}
         </div>
 
         <div class="stats-row">
           <div class="stat-box"><div class="stat-num">${notaMedia}</div><div class="stat-label">Avaliação</div></div>
-          <div class="stat-box"><div class="stat-num">${a.shows_feitos || 0}</div><div class="stat-label">Shows feitos</div></div>
           <div class="stat-box"><div class="stat-num">${a.anos_experiencia || '—'}</div><div class="stat-label">Anos de estrada</div></div>
         </div>
 
