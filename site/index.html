@@ -35,14 +35,13 @@
 
   <div id="listaArtistas"></div>
 
-  <div style="text-align:center; margin-top:40px; padding-top:24px; border-top:1px solid var(--line);">
+  <div id="blocoBaixarApp" style="display:none; text-align:center; margin-top:40px; padding-top:24px; border-top:1px solid var(--line);">
     <p style="color:var(--muted); font-size:12.5px; margin-bottom:10px;">
       Prefere usar pelo celular?
     </p>
-    <!-- TODO: trocar pelo link real assim que o app for publicado na Play Store -->
-    <a href="https://play.google.com/store/apps/details?id=SUBSTITUA_PELO_PACOTE_DO_APP"
+    <a id="linkBaixarApp" href="https://play.google.com/store/apps/details?id=com.palcolivre"
        target="_blank" class="rede-btn" style="display:inline-block;">
-      📲 Baixar o app na Play Store
+      📲 Abrir/Baixar o app
     </a>
   </div>
 </div>
@@ -52,6 +51,21 @@
 <script>
 let tipoAtivo = '';
 let timerBusca = null;
+
+// Só mostra o botão pra quem está acessando de um Android — em outros
+// sistemas nem faz sentido mostrar. iPhone e PC continuam sem esse bloco.
+if (/Android/i.test(navigator.userAgent)) {
+  document.getElementById('blocoBaixarApp').style.display = 'block';
+
+  // Usa o esquema "intent://" do Android: o navegador tenta abrir o app
+  // pelo scheme "palcolivre://" primeiro. Se o app estiver instalado, ele
+  // abre direto. Se NÃO estiver instalado, o Android cai automaticamente
+  // no "S.browser_fallback_url" (a página da Play Store) — tudo isso com
+  // um clique só, sem precisar adivinhar nada por JavaScript.
+  const playStoreUrl = encodeURIComponent('https://play.google.com/store/apps/details?id=com.palcolivre');
+  const intentUrl = `intent://open#Intent;scheme=palcolivre;package=com.palcolivre;S.browser_fallback_url=${playStoreUrl};end`;
+  document.getElementById('linkBaixarApp').href = intentUrl;
+}
 
 buscarContagemArtistas()
   .then(res => {
