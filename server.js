@@ -5,6 +5,7 @@ const { Pool } = require('pg');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -575,10 +576,29 @@ app.post('/artistas/:id/avaliacoes', async (req, res) => {
   const { nome_contratante, nota, comentario } = req.body;
 
   try {
+    // Proteção contra duplicata: se o app/site reenviar a mesma avaliação
+    // por causa de retry automático (rede lenta, servidor "acordando"),
+    // evita criar uma segunda linha idêntica nos últimos 2 minutos.
+    const recente = await pool.query(
+      `SELECT id, edit_token FROM avaliacoes
+       WHERE artista_id = $1 AND nome_contratante = $2 AND nota = $3
+         AND comentario IS NOT DISTINCT FROM $4
+         AND criado_em > now() - interval '2 minutes'`,
+      [id, nome_contratante, nota, comentario || null],
+    );
+    if (recente.rows.length > 0) {
+      return res.status(200).json(recente.rows[0]);
+    }
+
+    // Gera um "token de edição" único — é o que vai permitir que só quem
+    // escreveu a avaliação (guardando esse token no aparelho/navegador)
+    // consiga editar ou excluir ela depois, sem precisar de login.
+    const editToken = crypto.randomUUID();
+
     const { rows } = await pool.query(
-      `INSERT INTO avaliacoes (artista_id, nome_contratante, nota, comentario)
-       VALUES ($1,$2,$3,$4) RETURNING *`,
-      [id, nome_contratante, nota, comentario]
+      `INSERT INTO avaliacoes (artista_id, nome_contratante, nota, comentario, edit_token)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [id, nome_contratante, nota, comentario, editToken]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -587,6 +607,55 @@ app.post('/artistas/:id/avaliacoes', async (req, res) => {
   }
 });
 
+// Editar avaliação — só funciona se o edit_token bater com o salvo no banco
+app.put('/avaliacoes/:avaliacaoId', async (req, res) => {
+  const { avaliacaoId } = req.params;
+  const { edit_token, nota, comentario } = req.body;
+
+  if (!edit_token) {
+    return res.status(400).json({ erro: 'edit_token é obrigatório' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE avaliacoes SET nota = $1, comentario = $2
+       WHERE id = $3 AND edit_token = $4
+       RETURNING *`,
+      [nota, comentario, avaliacaoId, edit_token],
+    );
+    if (rows.length === 0) {
+      return res.status(403).json({ erro: 'Não foi possível editar esta avaliação' });
+    }
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Erro ao editar avaliação:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao editar avaliação' });
+  }
+});
+
+// Excluir avaliação — mesma proteção por edit_token
+app.delete('/avaliacoes/:avaliacaoId', async (req, res) => {
+  const { avaliacaoId } = req.params;
+  const { edit_token } = req.body;
+
+  if (!edit_token) {
+    return res.status(400).json({ erro: 'edit_token é obrigatório' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      'DELETE FROM avaliacoes WHERE id = $1 AND edit_token = $2 RETURNING id',
+      [avaliacaoId, edit_token],
+    );
+    if (rows.length === 0) {
+      return res.status(403).json({ erro: 'Não foi possível excluir esta avaliação' });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao excluir avaliação:', err.message || err);
+    res.status(500).json({ erro: 'Erro ao excluir avaliação' });
+  }
+});
 // Artista responde a uma avaliação
 app.post('/avaliacoes/:avaliacaoId/resposta', async (req, res) => {
   const { avaliacaoId } = req.params;
