@@ -1,5 +1,17 @@
 // PalcoLivre — funções auxiliares comuns a todas as páginas
 
+// ---------- Redireciona Android direto pro app / Play Store ----------
+// O site não é destinado a ser usado pelo navegador em celulares Android —
+// só existe pra alcançar quem não tem Android (PC, iPhone) ou pra servir de
+// ponte até a Play Store. Assim que a página carrega, se detectar Android,
+// já tenta abrir o app instalado; se não tiver, cai direto na Play Store.
+// Roda antes de qualquer outra coisa, pra não dar tempo da página aparecer.
+if (/Android/i.test(navigator.userAgent)) {
+  const playStoreUrl = encodeURIComponent('https://play.google.com/store/apps/details?id=com.palcolivre');
+  const intentUrl = `intent://open#Intent;scheme=palcolivre;package=com.palcolivre;S.browser_fallback_url=${playStoreUrl};end`;
+  window.location.href = intentUrl;
+}
+
 // ---------- Identidade do navegador (equivalente ao device_id do app) ----------
 // Não é tão robusto quanto o DeviceInfo do celular (limpar o navegador ou usar
 // aba anônima "perde" essa identidade), mas resolve bem pro MVP do site.
@@ -11,7 +23,6 @@ function getDeviceId() {
   }
   return id;
 }
-
 // ---------- Formatação de data ----------
 // O Postgres pode devolver 'YYYY-MM-DD' ou ISO completo — pegamos sempre só
 // os 10 primeiros caracteres antes de montar o Date.
@@ -27,7 +38,6 @@ function formatarDataCurta(dataRaw) {
     mon: meses[d.getMonth()],
   };
 }
-
 function formatarDataExtenso(dataRaw) {
   const dataISO = String(dataRaw).slice(0, 10);
   const d = new Date(dataISO + 'T00:00:00');
@@ -36,7 +46,6 @@ function formatarDataExtenso(dataRaw) {
   const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`;
 }
-
 // ---------- Link de rede social ----------
 function montarLinkRede(rede, valor) {
   const v = (valor || '').trim();
@@ -47,7 +56,6 @@ function montarLinkRede(rede, valor) {
   if (rede === 'tiktok') return `https://tiktok.com/@${usuario}`;
   return `https://youtube.com/${v.startsWith('@') ? v : `@${usuario}`}`;
 }
-
 // ---------- Toast simples de aviso ----------
 function mostrarToast(mensagem) {
   let toast = document.getElementById('toast-global');
@@ -62,19 +70,16 @@ function mostrarToast(mensagem) {
   clearTimeout(toast._timer);
   toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 3000);
 }
-
 // ---------- Pegar parâmetro da URL (?id=123) ----------
 function getQueryParam(nome) {
   return new URLSearchParams(window.location.search).get(nome);
 }
-
 // ---------- Escape simples de HTML (evita XSS ao inserir texto do usuário) ----------
 function escapeHtml(texto) {
   const div = document.createElement('div');
   div.textContent = texto ?? '';
   return div.innerHTML;
 }
-
 const TYPE_COLORS = {
   Cantor: '#e8a33d',
   Instrumentista: '#e85d75',
