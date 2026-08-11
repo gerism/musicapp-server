@@ -54,6 +54,7 @@ app.get('/artistas', async (req, res) => {
   const { busca, cidade, genero, tipo } = req.query;
   const cond = [
     'ativo = true',
+    'sinalizado = false',
     "(assinatura_status = 'ativo' OR (assinatura_status = 'trial' AND assinatura_vence_em > now()))",
   ];
   const params = [];
@@ -380,11 +381,27 @@ app.put('/artistas/:id', async (req, res) => {
 app.delete('/artistas/:id', async (req, res) => {
   const { id } = req.params;
   try {
+    // Antes de apagar do banco, busca todas as fotos (perfil + galeria)
+    // pra limpar do Cloudinary também — senão ficam órfãs pra sempre lá,
+    // mesmo depois do perfil sumir do app.
+    const artista = await pool.query('SELECT foto_capa_url FROM artistas WHERE id = $1', [id]);
+    const fotosGaleria = await pool.query('SELECT public_id FROM artista_fotos WHERE artista_id = $1', [id]);
+
     const { rows } = await pool.query(
       'DELETE FROM artistas WHERE id = $1 RETURNING id',
       [id],
     );
     if (rows.length === 0) return res.status(404).json({ erro: 'Artista não encontrado' });
+
+    const urlCapa = artista.rows[0]?.foto_capa_url;
+    if (urlCapa) {
+      const publicId = extrairPublicIdCapa(urlCapa);
+      if (publicId) cloudinary.uploader.destroy(publicId).catch(() => {});
+    }
+    fotosGaleria.rows.forEach(f => {
+      if (f.public_id) cloudinary.uploader.destroy(f.public_id).catch(() => {});
+    });
+
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -415,7 +432,7 @@ app.post('/artistas', async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO artistas
         (nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, instrumentos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id, assinatura_status, assinatura_vence_em)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'trial', now() + interval '7 days')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'trial', now() + interval '20 days')
        RETURNING *`,
       [nome_artistico, tipo_artista || 'Cantor', cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], instrumentos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
     );
@@ -429,6 +446,13 @@ app.post('/artistas', async (req, res) => {
   }
 });
 
+// Extrai o public_id do Cloudinary a partir da URL, pra poder apagar a
+// imagem de lá (mesma lógica já usada na rota de remover foto de perfil).
+function extrairPublicIdCapa(url) {
+  const match = String(url || '').match(/musicapp\/capas\/[^./]+/);
+  return match ? match[0] : null;
+}
+
 // Upload/troca da FOTO DE PERFIL
 app.post('/artistas/:id/foto-perfil', (req, res) => {
   uploadCapa.single('foto')(req, res, async (err) => {
@@ -441,10 +465,21 @@ app.post('/artistas/:id/foto-perfil', (req, res) => {
     if (!req.file) return res.status(400).json({ erro: 'Nenhuma foto enviada' });
 
     try {
+      // Pega a foto antiga ANTES de sobrescrever, pra poder apagar do
+      // Cloudinary depois — senão ela fica órfã lá pra sempre.
+      const atual = await pool.query('SELECT foto_capa_url FROM artistas WHERE id = $1', [id]);
+      const urlAntiga = atual.rows[0]?.foto_capa_url;
+
       const { rows } = await pool.query(
         'UPDATE artistas SET foto_capa_url = $1 WHERE id = $2 RETURNING foto_capa_url',
         [req.file.path, id]
       );
+
+      if (urlAntiga) {
+        const publicId = extrairPublicIdCapa(urlAntiga);
+        if (publicId) cloudinary.uploader.destroy(publicId).catch(() => {});
+      }
+
       res.json(rows[0]);
     } catch (err2) {
       console.error('Erro ao salvar no banco (foto-perfil):', err2.message || err2);
@@ -686,5 +721,93 @@ app.post('/avaliacoes/:avaliacaoId/denunciar', async (req, res) => {
 });
 
 // ============================================
+// ============================================
+// DENUNCIAR PERFIL (diferente de denunciar avaliação — essa é sobre o
+// cadastro inteiro do artista, tipo foto imprópria ou informação falsa)
+// ============================================
+app.post('/artistas/:id/denunciar', async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body || {};
+
+  try {
+    const artista = await pool.query('SELECT id FROM artistas WHERE id = $1', [id]);
+    if (artista.rows.length === 0) {
+      return res.status(404).json({ erro: 'Artista não encontrado' });
+    }
+
+    await pool.query(
+      'INSERT INTO denuncias_perfil (artista_id, motivo) VALUES ($1, $2)',
+      [id, motivo || 'Não especificado']
+    );
+
+    const contagem = await pool.query(
+      'SELECT COUNT(*) FROM denuncias_perfil WHERE artista_id = $1',
+      [id]
+    );
+    const total = parseInt(contagem.rows[0].count, 10);
+
+    if (total >= 3) {
+      await pool.query('UPDATE artistas SET sinalizado = true WHERE id = $1', [id]);
+      console.log(`Artista ${id} sinalizado automaticamente (${total} denúncias) — escondido da busca.`);
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao registrar denúncia:', err);
+    res.status(500).json({ erro: 'Erro ao registrar denúncia' });
+  }
+});
+
+// ============================================
+// LIMPEZA AUTOMÁTICA DE CADASTROS ABANDONADOS
+// ============================================
+//
+// Cobre o caso de alguém desinstalar o app (ou nunca mais voltar) sem
+// excluir o perfil. Depois de 60 dias com a assinatura vencida sem
+// ninguém renovar, o perfil some de vez — do banco e do Cloudinary.
+// Roda sozinho, uma vez por dia, sem precisar de ninguém mexer em nada.
+
+const DIAS_ATE_APAGAR_DE_VEZ = 60;
+
+async function limparCadastrosAbandonados() {
+  try {
+    const result = await pool.query(
+      `SELECT id, foto_capa_url FROM artistas
+       WHERE assinatura_status = 'vencido'
+       AND assinatura_vence_em < now() - interval '${DIAS_ATE_APAGAR_DE_VEZ} days'`
+    );
+
+    if (result.rows.length === 0) return;
+    console.log(`Limpeza automática: ${result.rows.length} perfil(is) abandonado(s) encontrado(s).`);
+
+    for (const artista of result.rows) {
+      const fotosGaleria = await pool.query(
+        'SELECT public_id FROM artista_fotos WHERE artista_id = $1',
+        [artista.id]
+      );
+
+      if (artista.foto_capa_url) {
+        const publicId = extrairPublicIdCapa(artista.foto_capa_url);
+        if (publicId) {
+          try { await cloudinary.uploader.destroy(publicId); } catch (e) { console.error(e.message); }
+        }
+      }
+      for (const foto of fotosGaleria.rows) {
+        if (foto.public_id) {
+          try { await cloudinary.uploader.destroy(foto.public_id); } catch (e) { console.error(e.message); }
+        }
+      }
+
+      await pool.query('DELETE FROM artistas WHERE id = $1', [artista.id]);
+      console.log(`Artista ${artista.id} apagado por abandono (60+ dias vencido).`);
+    }
+  } catch (err) {
+    console.error('Erro na limpeza automática:', err);
+  }
+}
+
+limparCadastrosAbandonados();
+setInterval(limparCadastrosAbandonados, 24 * 60 * 60 * 1000);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
