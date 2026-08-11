@@ -432,7 +432,7 @@ app.post('/artistas', async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO artistas
         (nome_artistico, tipo_artista, cidade, estado, raio_km, anos_experiencia, shows_feitos, generos, instrumentos, bio, formato, equipamento_proprio, duracao_media, cache_info, redes_sociais, whatsapp, device_id, assinatura_status, assinatura_vence_em)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'trial', now() + interval '20 days')
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'trial', now() + interval '20 days')
        RETURNING *`,
       [nome_artistico, tipo_artista || 'Cantor', cidade, estado, raio_km || 0, anos_experiencia || 0, shows_feitos || 0, generos || [], instrumentos || [], bio, formato, !!equipamento_proprio, duracao_media, cache_info, JSON.stringify(redes_sociais || {}), whatsapp, device_id]
     );
