@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — PalcoLivre</title>
+<style>
+  body {
+    background: #17111d;
+    color: #f3e9dd;
+    font-family: -apple-system, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #241b2c;
+    border: 1px solid #362a41;
+    border-radius: 16px;
+    padding: 28px;
+    max-width: 420px;
+    width: 100%;
+  }
+  h1 { font-size: 20px; margin: 0 0 20px; }
+  label { display: block; font-size: 13px; margin: 16px 0 6px; color: #bba9a0; }
+  input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #362a41;
+    background: #17111d;
+    color: #f3e9dd;
+    font-size: 15px;
+    box-sizing: border-box;
+  }
+  button {
+    width: 100%;
+    margin-top: 22px;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: #e8a33d;
+    color: #1a0f14;
+    font-weight: 800;
+    font-size: 14.5px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; }
+  #resultado {
+    margin-top: 18px;
+    font-size: 13.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .ok { color: #6fcf97; }
+  .erro { color: #eb5757; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎁 Liberar assinatura grátis — PalcoLivre</h1>
+
+    <label>Senha</label>
+    <input type="password" id="senha" placeholder="Senha do painel">
+
+    <label>Número do perfil (Nº que o amigo te passou)</label>
+    <input type="number" id="artistaId" placeholder="Ex: 42">
+
+    <label>Quantos dias liberar</label>
+    <input type="number" id="dias" value="30">
+
+    <button id="btnLiberar" onclick="liberar()">Liberar grátis</button>
+
+    <div id="resultado"></div>
+  </div>
+
+<script>
+async function liberar() {
+  const senha = document.getElementById('senha').value.trim();
+  const artistaId = document.getElementById('artistaId').value.trim();
+  const dias = document.getElementById('dias').value.trim() || '30';
+  const resultado = document.getElementById('resultado');
+  const btn = document.getElementById('btnLiberar');
+
+  if (!senha || !artistaId) {
+    resultado.innerHTML = '<span class="erro">Preenche a senha e o número do perfil.</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  resultado.textContent = 'Liberando...';
+
+  try {
+    const resp = await fetch('/admin/liberar-gratis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha, id: artistaId, dias })
+    });
+    const dados = await resp.json();
+
+    if (resp.ok) {
+      resultado.innerHTML = `<span class="ok">✅ Perfil #${artistaId} (${dados.nome_artistico || ''}) liberado até ${new Date(dados.assinatura_vence_em).toLocaleDateString('pt-BR')}.</span>`;
+    } else {
+      resultado.innerHTML = `<span class="erro">❌ ${dados.erro || 'Não foi possível liberar.'}</span>`;
+    }
+  } catch (e) {
+    resultado.innerHTML = '<span class="erro">❌ Erro de conexão com o servidor.</span>';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
