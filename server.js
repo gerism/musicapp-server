@@ -809,5 +809,43 @@ async function limparCadastrosAbandonados() {
 limparCadastrosAbandonados();
 setInterval(limparCadastrosAbandonados, 24 * 60 * 60 * 1000);
 
+// ============================================
+// ADMIN — LIBERAR ASSINATURA GRÁTIS (amigos/testadores)
+// ============================================
+const ADMIN_PASSWORD = 'palcolivreG#';
+
+app.post('/admin/liberar-gratis', async (req, res) => {
+  const { senha, id, dias } = req.body;
+
+  if (senha !== ADMIN_PASSWORD) {
+    return res.status(401).json({ erro: 'Senha incorreta.' });
+  }
+
+  const diasNum = parseInt(dias, 10) || 30;
+  if (!id || isNaN(parseInt(id, 10))) {
+    return res.status(400).json({ erro: 'Número do perfil inválido.' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE artistas
+         SET assinatura_status = 'ativo',
+             assinatura_vence_em = now() + make_interval(days => $2)
+       WHERE id = $1
+       RETURNING id, nome_artistico, assinatura_status, assinatura_vence_em`,
+      [id, diasNum]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ erro: 'Nenhum perfil encontrado com esse número.' });
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('Erro ao liberar assinatura grátis:', err);
+    res.status(500).json({ erro: 'Erro no servidor.' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
