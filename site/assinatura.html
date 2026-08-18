@@ -9,38 +9,31 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
 <div class="topbar">
   <a href="#" id="linkVoltar" class="back">← Voltar</a>
 </div>
-
 <div class="wrap" style="max-width:500px; text-align:center; padding-top:10px;">
   <h2 style="font-family:'Fraunces',serif; font-size:24px; margin-bottom:8px;">Assinatura PalcoLivre</h2>
   <p style="color:var(--muted); font-size:13px; margin-bottom:24px;">
     Seu perfil fica visível na busca enquanto a assinatura estiver ativa.
   </p>
-
   <div id="statusBox" style="background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:20px;">
     Carregando status...
   </div>
-
   <button id="btnAssinar" class="btn-primary" style="display:none;">
-    Assinar por R$10/mês (7 dias grátis)
+    Assinar por R$5,90/mês (20 dias grátis)
   </button>
 </div>
-
 <script src="js/common.js"></script>
 <script src="js/api.js"></script>
 <script>
 const id = getQueryParam('id');
 document.getElementById('linkVoltar').href = `editar.html?id=${id}`;
-
 if (!id) {
   document.getElementById('statusBox').textContent = 'Perfil não encontrado.';
 } else {
   carregarStatus();
 }
-
 async function carregarStatus() {
   const box = document.getElementById('statusBox');
   const btn = document.getElementById('btnAssinar');
@@ -59,14 +52,12 @@ async function carregarStatus() {
     box.textContent = 'Não foi possível carregar o status da assinatura.';
   }
 }
-
 document.getElementById('btnAssinar').addEventListener('click', async () => {
   const email = prompt('Digite seu e-mail (usado para o pagamento e recibo):');
   if (!email || !email.includes('@')) {
     mostrarToast('Informe um e-mail válido para continuar');
     return;
   }
-
   const btn = document.getElementById('btnAssinar');
   btn.disabled = true;
   btn.textContent = 'Redirecionando...';
@@ -76,10 +67,9 @@ document.getElementById('btnAssinar').addEventListener('click', async () => {
   } catch (e) {
     mostrarToast('Não foi possível iniciar a assinatura. Tenta de novo em instantes.');
     btn.disabled = false;
-    btn.textContent = 'Assinar por R$10/mês (7 dias grátis)';
+    btn.textContent = 'Assinar por R$5,90/mês (20 dias grátis)';
   }
 });
 </script>
-
 </body>
 </html>

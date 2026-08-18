@@ -9,41 +9,53 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
 <div id="conteudo">
   <div class="loading" style="padding-top:60px;">Carregando perfil...</div>
 </div>
-
 <script src="js/common.js"></script>
 <script src="js/api.js"></script>
 <script>
+const API_BASE_DENUNCIA = 'https://musicapp-server-production.up.railway.app';
 const id = getQueryParam('id');
-
 function labelTipoArtista(a) {
   if (a.tipo_artista === 'Instrumentista' && a.instrumentos && a.instrumentos.length) {
     return a.instrumentos.join(', ');
   }
   return '';
 }
-
 async function carregar() {
   const container = document.getElementById('conteudo');
   if (!id) {
     container.innerHTML = '<div class="empty-msg">Perfil não encontrado.</div>';
     return;
   }
-
   try {
     const a = await buscarPerfilArtista(id);
     document.title = `${a.nome_artistico} — PalcoLivre`;
-
     // Só mostra o lápis de editar e o link de assinatura pra quem é dono
     // de verdade desse perfil (mesmo navegador que criou o cadastro).
     const souDono = a.device_id && a.device_id === getDeviceId();
-
     const notaMedia = a.avaliacoes.length > 0
       ? (a.avaliacoes.reduce((s, av) => s + av.nota, 0) / a.avaliacoes.length).toFixed(1)
       : '—';
+
+    let avisoVencidoHtml = '';
+    if (souDono) {
+      try {
+        const statusResp = await fetch(`${API_BASE_DENUNCIA}/artistas/${a.id}/assinatura`);
+        if (statusResp.ok) {
+          const status = await statusResp.json();
+          if (status.assinatura_status === 'vencido') {
+            avisoVencidoHtml = `
+              <a href="assinatura.html?id=${a.id}" class="aviso-vencido">
+                ⚠️ Sua assinatura venceu — seu perfil está oculto da busca. Toque aqui pra assinar de novo.
+              </a>`;
+          }
+        }
+      } catch {
+        // silencioso — se falhar, simplesmente não mostra o aviso
+      }
+    }
 
     let html = `
       <div class="hero" style="background-image:url('${a.foto_capa_url || 'assets/avatar-placeholder.png'}')">
@@ -64,18 +76,16 @@ async function carregar() {
           </div>
         </div>
       </div>
-
+      ${avisoVencidoHtml}
       <div class="wrap">
         <div class="tags-row">
           ${(a.generos || []).map(g => `<div class="tag">${escapeHtml(g)}</div>`).join('')}
           ${labelTipoArtista(a) ? `<div class="tag">${escapeHtml(labelTipoArtista(a))}</div>` : ''}
         </div>
-
         <div class="stats-row">
           <div class="stat-box"><div class="stat-num">${notaMedia}</div><div class="stat-label">Avaliação</div></div>
           <div class="stat-box"><div class="stat-num">${a.anos_experiencia || '—'}</div><div class="stat-label">Anos de estrada</div></div>
         </div>
-
         <div class="section">
           <div class="eyebrow">PRÓXIMAS DATAS</div>
           <div class="avail-strip">
@@ -99,7 +109,6 @@ async function carregar() {
               }).join('')}
             </div>` : ''}
         </div>
-
         ${a.fotos.length > 0 ? `
         <div class="section">
           <div class="eyebrow">FOTOS</div>
@@ -107,15 +116,12 @@ async function carregar() {
             ${a.fotos.map(f => `<img src="${f.url}" onclick="abrirImagemAmpliada('${f.url}')" style="cursor:pointer;">`).join('')}
           </div>
         </div>` : ''}
-
         ${a.bio ? `
         <div class="section">
           <div class="eyebrow">SOBRE</div>
           <p class="bio-text">${escapeHtml(a.bio)}</p>
         </div>` : ''}
-
         ${renderRedesSociais(a.redes_sociais)}
-
         <div class="section">
           <div class="eyebrow">FICHA TÉCNICA</div>
           <div class="info-list">
@@ -125,7 +131,6 @@ async function carregar() {
             ${a.cache_info ? `<div class="info-row"><span class="info-label">Cachê</span><span class="info-value">${escapeHtml(a.cache_info)}</span></div>` : ''}
           </div>
         </div>
-
         <div class="section">
           <div class="eyebrow">AVALIAÇÕES <a href="avaliar.html?id=${a.id}">+ Deixar avaliação</a></div>
           ${a.avaliacoes.length === 0 ? '<div class="artist-sub">Ainda não há avaliações.</div>' :
@@ -145,22 +150,23 @@ async function carregar() {
               </div>
             `).join('')}
         </div>
-
         <div class="cta-row">
           <a href="https://wa.me/${a.whatsapp}?text=${encodeURIComponent('Olá ' + a.nome_artistico + '! Vi seu perfil no PalcoLivre e gostaria de saber sobre disponibilidade para um show.')}"
              target="_blank" class="cta-primary" style="display:flex;align-items:center;justify-content:center;">
             📲 Chamar no WhatsApp
           </a>
         </div>
+        ${!souDono ? `
+        <div style="text-align:center; padding:20px 0 8px;">
+          <span class="report-link" style="cursor:pointer;" onclick="denunciarPerfilInteiro(${a.id})">🚩 Denunciar esse perfil</span>
+        </div>` : ''}
       </div>
     `;
-
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = `<div class="empty-msg">${escapeHtml(e.message)}</div>`;
   }
 }
-
 function renderRedesSociais(redes) {
   if (!redes) return '';
   const links = [];
@@ -170,7 +176,6 @@ function renderRedesSociais(redes) {
   if (links.length === 0) return '';
   return `<div class="section"><div class="eyebrow">REDES SOCIAIS</div><div class="redes-row">${links.join('')}</div></div>`;
 }
-
 async function denunciar(avaliacaoId) {
   try {
     await denunciarAvaliacao(avaliacaoId);
@@ -179,7 +184,26 @@ async function denunciar(avaliacaoId) {
     mostrarToast('Não foi possível denunciar agora.');
   }
 }
+async function denunciarPerfilInteiro(artistaId) {
+  const motivo = prompt('Qual o motivo da denúncia?\n\nDigite: "foto" (foto imprópria), "falso" (informação falsa) ou escreva outro motivo:');
+  if (!motivo) return;
 
+  let motivoFinal = motivo.trim();
+  if (motivoFinal.toLowerCase() === 'foto') motivoFinal = 'Foto imprópria';
+  if (motivoFinal.toLowerCase() === 'falso') motivoFinal = 'Informação falsa';
+
+  try {
+    const resp = await fetch(`${API_BASE_DENUNCIA}/artistas/${artistaId}/denunciar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo: motivoFinal }),
+    });
+    if (!resp.ok) throw new Error();
+    mostrarToast('Obrigado! Sua denúncia foi registrada e será analisada.');
+  } catch {
+    mostrarToast('Não foi possível enviar a denúncia agora.');
+  }
+}
 function abrirImagemAmpliada(url) {
   const modal = document.createElement('div');
   modal.id = 'modalImagem';
@@ -191,9 +215,7 @@ function abrirImagemAmpliada(url) {
   `;
   document.body.appendChild(modal);
 }
-
 carregar();
 </script>
-
 </body>
 </html>
