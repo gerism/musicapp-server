@@ -1,4 +1,4 @@
-/* ClaudioTem — site
+/* PalcoLivre — site
    Paleta espelha a do app (src/theme/colors.ts): fundo roxo escuro
    "palco à noite" + dourado "holofote". */
 
@@ -131,10 +131,16 @@ header.hero {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding: 16px 20px 4px;
-  scrollbar-width: none;
+  padding: 16px 20px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--spotlight) transparent;
 }
-.chip-row::-webkit-scrollbar { display: none; }
+.chip-row::-webkit-scrollbar { height: 6px; }
+.chip-row::-webkit-scrollbar-track { background: transparent; }
+.chip-row::-webkit-scrollbar-thumb {
+  background: var(--spotlight);
+  border-radius: 100px;
+}
 
 .chip {
   flex-shrink: 0;
@@ -416,4 +422,22 @@ main {
   color: var(--muted);
   text-align: center;
   margin-top: 14px;
+}
+
+/* ---------- PC: centraliza layout numa faixa central ---------- */
+@media (min-width: 700px) {
+  header.hero,
+  .chip-row,
+  .footer-cta {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .perfil-hero {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 0 0 16px 16px;
+    overflow: hidden;
+  }
 }
