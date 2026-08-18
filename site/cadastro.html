@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   .foto-wrap{
     width:110px; height:110px; border-radius:55px; overflow:hidden;
@@ -37,11 +39,69 @@
   <div class="loading">Verificando...</div>
 </div>
 
+<!-- O reCAPTCHA do Firebase é renderizado aqui, de forma invisível -->
+<div id="recaptcha-container"></div>
+
 <script src="js/common.js"></script>
 <script src="js/api.js"></script>
 <script>
 let cidadesConhecidas = [];
 let fotoArquivo = null;
+
+// ---------- Firebase (verificação de telefone) ----------
+const firebaseConfig = {
+  apiKey: "AIzaSyAaMmLmq7JetiNkxJLA3cND3vlvSaVWdHM",
+  authDomain: "palcolivre-1d0c8.firebaseapp.com",
+  projectId: "palcolivre-1d0c8",
+  storageBucket: "palcolivre-1d0c8.firebasestorage.app",
+  messagingSenderId: "569684846250",
+  appId: "1:569684846250:web:4f0f719f8bb44dd80092d3",
+};
+firebase.initializeApp(firebaseConfig);
+
+let recaptchaVerifier = null;
+
+function getRecaptcha() {
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+      size: 'invisible',
+    });
+  }
+  return recaptchaVerifier;
+}
+
+// Transforma "37999999999" em "+5537999999999" (formato E.164, exigido
+// pelo Firebase). Assume sempre Brasil (+55).
+function paraE164(numero) {
+  const soDigitos = numero.replace(/\D/g, '');
+  return `+55${soDigitos}`;
+}
+
+// Envia o SMS e pede o código pro usuário digitar (via prompt()).
+// Retorna true se confirmado, false se cancelado/errado.
+async function verificarTelefone(numeroWhatsapp) {
+  try {
+    const confirmationResult = await firebase.auth().signInWithPhoneNumber(
+      paraE164(numeroWhatsapp),
+      getRecaptcha(),
+    );
+
+    const codigo = prompt('Enviamos um código por SMS para ' + numeroWhatsapp + '.\n\nDigite o código de 6 dígitos:');
+    if (!codigo) return false;
+
+    await confirmationResult.confirm(codigo.trim());
+    return true;
+  } catch (err) {
+    if (err.code === 'auth/invalid-verification-code') {
+      alert('Código incorreto. Tenta cadastrar de novo.');
+    } else if (err.code === 'auth/too-many-requests') {
+      alert('Muitas tentativas com esse número. Espera um pouco e tenta de novo.');
+    } else {
+      alert('Não foi possível verificar o número. Confere se está certo e tenta de novo.');
+    }
+    return false;
+  }
+}
 
 async function iniciar() {
   const deviceId = getDeviceId();
@@ -113,6 +173,7 @@ function renderFormulario() {
 
     <label class="form-label">WhatsApp (com DDD) *</label>
     <input type="text" id="whatsapp" class="form-input" placeholder="37999999999">
+    <div class="form-note" style="margin-top:6px;">Vamos enviar um código por SMS pra confirmar esse número.</div>
 
     <label class="form-label">Gêneros musicais (separados por vírgula)</label>
     <input type="text" id="generos" class="form-input" placeholder="Sertanejo raiz, MPB">
@@ -229,6 +290,15 @@ async function salvar() {
 
   const btn = document.getElementById('btnSalvar');
   btn.disabled = true;
+  btn.textContent = 'Enviando SMS...';
+
+  const verificado = await verificarTelefone(whatsapp);
+  if (!verificado) {
+    btn.disabled = false;
+    btn.textContent = 'Criar meu perfil';
+    return;
+  }
+
   btn.textContent = 'Criando...';
 
   try {
