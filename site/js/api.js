@@ -101,8 +101,11 @@ function enviarAvaliacao(artistaId, dados) {
   });
 }
 
-function denunciarAvaliacao(avaliacaoId) {
-  return apiRequest(`/avaliacoes/${avaliacaoId}/denunciar`, { method: 'POST' });
+function denunciarAvaliacao(avaliacaoId, motivo) {
+  return apiRequest(`/avaliacoes/${avaliacaoId}/denunciar`, {
+    method: 'POST',
+    body: JSON.stringify({ motivo }),
+  });
 }
 
 // ---------- Fotos ----------

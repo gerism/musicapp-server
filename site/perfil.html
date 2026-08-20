@@ -177,8 +177,16 @@ function renderRedesSociais(redes) {
   return `<div class="section"><div class="eyebrow">REDES SOCIAIS</div><div class="redes-row">${links.join('')}</div></div>`;
 }
 async function denunciar(avaliacaoId) {
+  const motivo = prompt('Qual o motivo da denúncia?\n\nDigite: "ofensiva", "falsa", "spam" ou escreva outro motivo (deixe em branco e cancele pra desistir):');
+  if (!motivo) return; // usuário cancelou ou deixou em branco — não denuncia
+
+  let motivoFinal = motivo.trim();
+  if (motivoFinal.toLowerCase() === 'ofensiva') motivoFinal = 'Ofensiva ou abusiva';
+  if (motivoFinal.toLowerCase() === 'falsa') motivoFinal = 'Falsa ou enganosa';
+  if (motivoFinal.toLowerCase() === 'spam') motivoFinal = 'Spam';
+
   try {
-    await denunciarAvaliacao(avaliacaoId);
+    await denunciarAvaliacao(avaliacaoId, motivoFinal);
     mostrarToast('Avaliação denunciada. Nossa equipe vai revisar.');
   } catch (e) {
     mostrarToast('Não foi possível denunciar agora.');

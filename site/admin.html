@@ -18,7 +18,7 @@
     border: 1px solid #362a41;
     border-radius: 16px;
     padding: 28px;
-    max-width: 420px;
+    max-width: 480px;
     width: 100%;
   }
   h1 { font-size: 20px; margin: 0 0 20px; }
@@ -54,42 +54,116 @@
   }
   .ok { color: #6fcf97; }
   .erro { color: #eb5757; }
+
+  /* Abas */
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #362a41;
+    background: #17111d;
+    color: #bba9a0;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+  }
+  .tab-btn.ativa { background: #e8a33d; color: #1a0f14; border-color: #e8a33d; }
+  .tab-content { display: none; }
+  .tab-content.ativa { display: block; }
+
+  /* Lista de denúncias */
+  .denuncia-card {
+    background: #17111d;
+    border: 1px solid #362a41;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .denuncia-titulo { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .denuncia-sub { color: #bba9a0; font-size: 12px; margin-bottom: 8px; }
+  .denuncia-motivo {
+    background: #241b2c;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    margin-bottom: 6px;
+  }
+  .denuncia-btns { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-pequeno {
+    flex: 1;
+    margin-top: 0;
+    padding: 10px;
+    font-size: 12.5px;
+  }
+  .btn-liberar { background: #6fcf97; color: #0b1f10; }
+  .btn-atualizar {
+    background: transparent;
+    border: 1px solid #362a41;
+    color: #f3e9dd;
+    margin-bottom: 4px;
+  }
+  .vazio { color: #bba9a0; font-size: 13px; text-align: center; padding: 20px 0; }
 </style>
 </head>
 <body>
   <div class="card">
-    <h1>🎁 Liberar assinatura grátis — PalcoLivre</h1>
+    <h1>🎛️ Painel Admin — PalcoLivre</h1>
 
-    <label>Senha</label>
-    <input type="password" id="senha" placeholder="Senha do painel">
+    <div class="tabs">
+      <div class="tab-btn ativa" id="tabBtnAssinatura" onclick="mudarAba('assinatura')">🎁 Assinatura grátis</div>
+      <div class="tab-btn" id="tabBtnDenuncias" onclick="mudarAba('denuncias')">🚩 Denúncias</div>
+    </div>
 
-    <label>Número do perfil (Nº que o amigo te passou)</label>
-    <input type="number" id="artistaId" placeholder="Ex: 42">
+    <!-- ABA: LIBERAR ASSINATURA -->
+    <div class="tab-content ativa" id="tabAssinatura">
+      <label>Senha</label>
+      <input type="password" id="senha" placeholder="Senha do painel">
+      <label>Número do perfil (Nº que o amigo te passou)</label>
+      <input type="number" id="artistaId" placeholder="Ex: 42">
+      <label>Quantos dias liberar</label>
+      <input type="number" id="dias" value="30">
+      <button id="btnLiberar" onclick="liberar()">Liberar grátis</button>
+      <div id="resultado"></div>
+    </div>
 
-    <label>Quantos dias liberar</label>
-    <input type="number" id="dias" value="30">
+    <!-- ABA: DENÚNCIAS -->
+    <div class="tab-content" id="tabDenuncias">
+      <label>Senha</label>
+      <input type="password" id="senhaDenuncias" placeholder="Senha do painel">
+      <button class="btn-atualizar" onclick="carregarDenuncias()">🔄 Carregar denúncias</button>
 
-    <button id="btnLiberar" onclick="liberar()">Liberar grátis</button>
+      <div id="resultadoDenuncias"></div>
 
-    <div id="resultado"></div>
+      <h2 style="font-size:14px; margin-top:22px; color:#e8a33d;">Perfis escondidos por denúncia</h2>
+      <div id="listaPerfis"><div class="vazio">Carrega pra ver a lista.</div></div>
+
+      <h2 style="font-size:14px; margin-top:22px; color:#e8a33d;">Avaliações denunciadas</h2>
+      <div id="listaAvaliacoes"><div class="vazio">Carrega pra ver a lista.</div></div>
+    </div>
   </div>
 
 <script>
+function mudarAba(aba) {
+  document.getElementById('tabAssinatura').classList.toggle('ativa', aba === 'assinatura');
+  document.getElementById('tabDenuncias').classList.toggle('ativa', aba === 'denuncias');
+  document.getElementById('tabBtnAssinatura').classList.toggle('ativa', aba === 'assinatura');
+  document.getElementById('tabBtnDenuncias').classList.toggle('ativa', aba === 'denuncias');
+}
+
 async function liberar() {
   const senha = document.getElementById('senha').value.trim();
   const artistaId = document.getElementById('artistaId').value.trim();
   const dias = document.getElementById('dias').value.trim() || '30';
   const resultado = document.getElementById('resultado');
   const btn = document.getElementById('btnLiberar');
-
   if (!senha || !artistaId) {
     resultado.innerHTML = '<span class="erro">Preenche a senha e o número do perfil.</span>';
     return;
   }
-
   btn.disabled = true;
   resultado.textContent = 'Liberando...';
-
   try {
     const resp = await fetch('/admin/liberar-gratis', {
       method: 'POST',
@@ -97,7 +171,6 @@ async function liberar() {
       body: JSON.stringify({ senha, id: artistaId, dias })
     });
     const dados = await resp.json();
-
     if (resp.ok) {
       resultado.innerHTML = `<span class="ok">✅ Perfil #${artistaId} (${dados.nome_artistico || ''}) liberado até ${new Date(dados.assinatura_vence_em).toLocaleDateString('pt-BR')}.</span>`;
     } else {
@@ -107,6 +180,109 @@ async function liberar() {
     resultado.innerHTML = '<span class="erro">❌ Erro de conexão com o servidor.</span>';
   } finally {
     btn.disabled = false;
+  }
+}
+
+let senhaAtualDenuncias = '';
+
+async function carregarDenuncias() {
+  const senha = document.getElementById('senhaDenuncias').value.trim();
+  const resultadoDiv = document.getElementById('resultadoDenuncias');
+  if (!senha) {
+    resultadoDiv.innerHTML = '<span class="erro">Preenche a senha.</span>';
+    return;
+  }
+  senhaAtualDenuncias = senha;
+  resultadoDiv.textContent = 'Carregando...';
+  try {
+    const resp = await fetch('/admin/denuncias/listar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha })
+    });
+    const dados = await resp.json();
+    if (!resp.ok) {
+      resultadoDiv.innerHTML = `<span class="erro">❌ ${dados.erro || 'Erro ao carregar.'}</span>`;
+      return;
+    }
+    resultadoDiv.innerHTML = '';
+    renderizarPerfis(dados.perfis || []);
+    renderizarAvaliacoes(dados.avaliacoes || []);
+  } catch (e) {
+    resultadoDiv.innerHTML = '<span class="erro">❌ Erro de conexão com o servidor.</span>';
+  }
+}
+
+function renderizarPerfis(perfis) {
+  const container = document.getElementById('listaPerfis');
+  if (perfis.length === 0) {
+    container.innerHTML = '<div class="vazio">Nenhum perfil escondido no momento.</div>';
+    return;
+  }
+  container.innerHTML = perfis.map(p => `
+    <div class="denuncia-card">
+      <div class="denuncia-titulo">#${p.id} — ${p.nome_artistico}</div>
+      <div class="denuncia-sub">${p.denuncias.length} denúncia(s)</div>
+      ${p.denuncias.map(d => `<div class="denuncia-motivo">📌 ${d.motivo}</div>`).join('')}
+      <div class="denuncia-btns">
+        <button class="btn-pequeno btn-liberar" onclick="liberarPerfil(${p.id})">✅ Foi engano, liberar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderizarAvaliacoes(avaliacoes) {
+  const container = document.getElementById('listaAvaliacoes');
+  if (avaliacoes.length === 0) {
+    container.innerHTML = '<div class="vazio">Nenhuma avaliação denunciada no momento.</div>';
+    return;
+  }
+  container.innerHTML = avaliacoes.map(av => `
+    <div class="denuncia-card">
+      <div class="denuncia-titulo">${av.nome_artistico} — avaliação de ${av.nome_contratante}</div>
+      <div class="denuncia-sub">Nota: ${'★'.repeat(av.nota)}${'☆'.repeat(5 - av.nota)}</div>
+      ${av.comentario ? `<div class="denuncia-motivo">💬 "${av.comentario}"</div>` : ''}
+      <div class="denuncia-motivo">📌 Motivo da denúncia: ${av.denuncia_motivo || 'Não especificado'}</div>
+      <div class="denuncia-btns">
+        <button class="btn-pequeno btn-liberar" onclick="cancelarDenunciaAvaliacao(${av.id})">✅ Foi engano, cancelar denúncia</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function liberarPerfil(artistaId) {
+  if (!confirm('Confirma que essa denúncia foi engano e quer liberar o perfil de volta?')) return;
+  try {
+    const resp = await fetch('/admin/denuncias/perfil/liberar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha: senhaAtualDenuncias, artista_id: artistaId })
+    });
+    if (resp.ok) {
+      carregarDenuncias();
+    } else {
+      alert('Não foi possível liberar o perfil.');
+    }
+  } catch (e) {
+    alert('Erro de conexão com o servidor.');
+  }
+}
+
+async function cancelarDenunciaAvaliacao(avaliacaoId) {
+  if (!confirm('Confirma que essa denúncia foi engano e quer cancelar ela?')) return;
+  try {
+    const resp = await fetch('/admin/denuncias/avaliacao/cancelar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha: senhaAtualDenuncias, avaliacao_id: avaliacaoId })
+    });
+    if (resp.ok) {
+      carregarDenuncias();
+    } else {
+      alert('Não foi possível cancelar a denúncia.');
+    }
+  } catch (e) {
+    alert('Erro de conexão com o servidor.');
   }
 }
 </script>

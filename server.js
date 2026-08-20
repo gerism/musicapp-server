@@ -708,11 +708,15 @@ app.post('/avaliacoes/:avaliacaoId/resposta', async (req, res) => {
   }
 });
 
-// Denunciar avaliação (vai pra moderação, não apaga)
+// Denunciar avaliação, agora com motivo (vai pra moderação, não apaga)
 app.post('/avaliacoes/:avaliacaoId/denunciar', async (req, res) => {
   const { avaliacaoId } = req.params;
+  const { motivo } = req.body || {};
   try {
-    await pool.query('UPDATE avaliacoes SET denunciada = true WHERE id = $1', [avaliacaoId]);
+    await pool.query(
+      'UPDATE avaliacoes SET denunciada = true, denuncia_motivo = $1 WHERE id = $2',
+      [motivo || 'Não especificado', avaliacaoId]
+    );
     res.json({ ok: true });
   } catch (err) {
     console.error(err);
@@ -838,10 +842,74 @@ app.post('/admin/liberar-gratis', async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ erro: 'Nenhum perfil encontrado com esse número.' });
     }
-
     res.json(rows[0]);
   } catch (err) {
     console.error('Erro ao liberar assinatura grátis:', err);
+    res.status(500).json({ erro: 'Erro no servidor.' });
+  }
+});
+
+// ============================================
+// ADMIN — DENÚNCIAS
+// ============================================
+
+app.post('/admin/denuncias/listar', async (req, res) => {
+  const { senha } = req.body;
+  if (senha !== ADMIN_PASSWORD) return res.status(401).json({ erro: 'Senha incorreta.' });
+
+  try {
+    const perfis = await pool.query(`
+      SELECT a.id, a.nome_artistico,
+             json_agg(json_build_object('motivo', d.motivo, 'criado_em', d.criado_em) ORDER BY d.criado_em DESC) AS denuncias
+      FROM artistas a
+      JOIN denuncias_perfil d ON d.artista_id = a.id
+      WHERE a.sinalizado = true
+      GROUP BY a.id, a.nome_artistico
+      ORDER BY a.id DESC
+    `);
+
+    const avaliacoes = await pool.query(`
+      SELECT av.id, av.nome_contratante, av.nota, av.comentario, av.denuncia_motivo,
+             av.artista_id, a.nome_artistico
+      FROM avaliacoes av
+      JOIN artistas a ON a.id = av.artista_id
+      WHERE av.denunciada = true
+      ORDER BY av.id DESC
+    `);
+
+    res.json({ perfis: perfis.rows, avaliacoes: avaliacoes.rows });
+  } catch (err) {
+    console.error('Erro ao listar denúncias:', err);
+    res.status(500).json({ erro: 'Erro no servidor.' });
+  }
+});
+
+app.post('/admin/denuncias/perfil/liberar', async (req, res) => {
+  const { senha, artista_id } = req.body;
+  if (senha !== ADMIN_PASSWORD) return res.status(401).json({ erro: 'Senha incorreta.' });
+
+  try {
+    await pool.query('UPDATE artistas SET sinalizado = false WHERE id = $1', [artista_id]);
+    await pool.query('DELETE FROM denuncias_perfil WHERE artista_id = $1', [artista_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao liberar perfil:', err);
+    res.status(500).json({ erro: 'Erro no servidor.' });
+  }
+});
+
+app.post('/admin/denuncias/avaliacao/cancelar', async (req, res) => {
+  const { senha, avaliacao_id } = req.body;
+  if (senha !== ADMIN_PASSWORD) return res.status(401).json({ erro: 'Senha incorreta.' });
+
+  try {
+    await pool.query(
+      'UPDATE avaliacoes SET denunciada = false, denuncia_motivo = NULL WHERE id = $1',
+      [avaliacao_id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao cancelar denúncia:', err);
     res.status(500).json({ erro: 'Erro no servidor.' });
   }
 });
